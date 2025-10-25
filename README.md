@@ -2,10 +2,13 @@
 
 A cutting-edge web application that visualizes the Starlink satellite constellation in real-time 3D and analyzes its impact on Earth Observation (EO) satellite operations.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![React](https://img.shields.io/badge/react-18.3+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![TypeScript](https://img.shields.io/badge/typescript-5.7+-blue.svg)
+![FastAPI](https://img.shields.io/badge/fastapi-0.104+-009688.svg)
+![Cesium](https://img.shields.io/badge/cesium-1.121+-4285F4.svg)
 
 ## 🌟 Features
 
