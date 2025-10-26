@@ -1,8 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Ion } from 'cesium'
 import App from './App'
 import './index.css'
+
+// Configure Cesium Ion Access Token
+// Token is set via environment variable in docker-compose.yml
+Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,11 +20,9 @@ const queryClient = new QueryClient({
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </React.StrictMode>,
+  <QueryClientProvider client={queryClient}>
+    <App />
+  </QueryClientProvider>,
 )
 
 
