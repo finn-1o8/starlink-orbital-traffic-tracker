@@ -73,6 +73,9 @@ services:
     environment:
       VITE_API_URL: http://localhost:8000/api
       VITE_WS_URL: ws://localhost:8000/api
+      # Get your free Cesium Ion token at: https://ion.cesium.com/
+      # Replace 'your_cesium_token_here' with your actual token
+      VITE_CESIUM_ION_TOKEN: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZTNlMTc0OC1iYjkzLTRkZWYtOTJmZS1iMGE3NTJhMjMwMzciLCJpZCI6MzU0MDEyLCJpYXQiOjE3NjE0MzgxMTR9.FHPtMVfJrwVPrU8BfSsVaxGbfIWorLrmbSS6z683-as
     ports:
       - "3000:3000"
     depends_on:

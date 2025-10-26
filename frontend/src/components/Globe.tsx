@@ -3,7 +3,7 @@
  * Main 3D visualization of satellites and Earth
  */
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, Cartesian3, Color, NearFarScalar, createWorldTerrain } from 'cesium';
+import * as Cesium from 'cesium';
 import { satelliteApi } from '../services/api';
 import type { SatellitePosition, OrbitPath } from '../types';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -17,7 +17,7 @@ interface GlobeProps {
 
 function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: GlobeProps) {
   const cesiumContainer = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<Viewer | null>(null);
+  const viewerRef = useRef<Cesium.Viewer | null>(null);
   const satelliteEntitiesRef = useRef<Map<number, any>>(new Map());
   const orbitEntityRef = useRef<any>(null);
 
@@ -25,8 +25,8 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
   useEffect(() => {
     if (!cesiumContainer.current || viewerRef.current) return;
 
-    const viewer = new Viewer(cesiumContainer.current, {
-      terrainProvider: createWorldTerrain(),
+    const viewer = new Cesium.Viewer(cesiumContainer.current, {
+      terrainProvider: Cesium.createWorldTerrain ? Cesium.createWorldTerrain() : undefined,
       baseLayerPicker: false,
       geocoder: false,
       homeButton: true,
@@ -35,12 +35,11 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
       navigationHelpButton: false,
       animation: false,
       scene3DOnly: true,
-      skyAtmosphere: true,
     });
 
     // Set initial camera position (above Earth)
     viewer.camera.setView({
-      destination: Cartesian3.fromDegrees(-74.0060, 40.7128, 15000000),
+      destination: Cesium.Cartesian3.fromDegrees(-74.0060, 40.7128, 15000000),
       orientation: {
         heading: 0,
         pitch: -Math.PI / 2,
@@ -52,7 +51,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
     viewer.scene.globe.enableLighting = true;
 
     // Handle click events
-    const handler = new (window as any).Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     handler.setInputAction((click: any) => {
       const pickedObject = viewer.scene.pick(click.position);
       if (pickedObject && pickedObject.id && pickedObject.id.properties) {
@@ -61,13 +60,17 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
           onSatelliteClick(noradId);
         }
       }
-    }, (window as any).Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     viewerRef.current = viewer;
 
     return () => {
-      handler.destroy();
-      viewer.destroy();
+      if (handler && !handler.isDestroyed()) {
+        handler.destroy();
+      }
+      if (viewer && !viewer.isDestroyed()) {
+        viewer.destroy();
+      }
       viewerRef.current = null;
     };
   }, []);
@@ -96,7 +99,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
 
       if (entity) {
         // Update existing entity
-        entity.position = Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
+        entity.position = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
         if (entity.point) {
           entity.point.pixelSize = pixelSize;
           entity.point.color = color;
@@ -105,25 +108,25 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
         // Create new entity
         entity = viewer.entities.add({
           id: `sat-${sat.norad_id}`,
-          position: Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000),
+          position: Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000),
           point: {
             pixelSize: pixelSize,
             color: color,
-            outlineColor: Color.WHITE,
+            outlineColor: Cesium.Color.WHITE,
             outlineWidth: 1,
-            scaleByDistance: new NearFarScalar(1.5e6, 2.0, 8.0e6, 0.5),
+            scaleByDistance: new Cesium.NearFarScalar(1.5e6, 2.0, 8.0e6, 0.5),
           },
           label: {
             text: sat.name,
             font: '12px Inter',
-            fillColor: Color.WHITE,
-            outlineColor: Color.BLACK,
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
-            style: (window as any).Cesium.LabelStyle.FILL_AND_OUTLINE,
-            verticalOrigin: (window as any).Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new (window as any).Cesium.Cartesian2(0, -12),
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -12),
             show: isSelected,
-            distanceDisplayCondition: new (window as any).Cesium.DistanceDisplayCondition(0, 5000000),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000000),
           },
           properties: {
             norad_id: sat.norad_id,
@@ -161,7 +164,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
           if (!viewer || !viewerRef.current) return;
 
           const positions = orbitData.orbit_points.map(point =>
-            Cartesian3.fromDegrees(point.lon, point.lat, point.alt_km * 1000)
+            Cesium.Cartesian3.fromDegrees(point.lon, point.lat, point.alt_km * 1000)
           );
 
           const entity = viewer.entities.add({
@@ -169,7 +172,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
             polyline: {
               positions: positions,
               width: 2,
-              material: Color.CYAN.withAlpha(0.6),
+              material: Cesium.Color.CYAN.withAlpha(0.6),
             },
           });
 
@@ -187,11 +190,11 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
 /**
  * Get color based on altitude band
  */
-function getColorByAltitude(altKm: number): typeof Color {
-  if (altKm < 400) return Color.RED;
-  if (altKm < 600) return Color.CYAN;
-  if (altKm < 1400) return Color.YELLOW;
-  return Color.GRAY;
+function getColorByAltitude(altKm: number) {
+  if (altKm < 400) return Cesium.Color.RED;
+  if (altKm < 600) return Cesium.Color.CYAN;
+  if (altKm < 1400) return Cesium.Color.YELLOW;
+  return Cesium.Color.GRAY;
 }
 
 export default Globe;
