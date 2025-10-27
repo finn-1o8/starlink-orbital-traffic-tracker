@@ -267,6 +267,19 @@ Full API documentation: http://localhost:8000/docs
 
 ## 🔧 Configuration
 
+### Development vs Production
+
+**Development:**
+- Use `docker-compose.yml` (includes dev tools, hot reload)
+- Environment: `backend/.env` and `frontend/.env`
+
+**Production:**
+- Use `docker-compose.prod.yml` (optimized, SSL-ready)
+- Copy `backend/env.example` to `backend/.env`
+- Copy `frontend/env.example` to `frontend/.env`
+- Configure `nginx.conf` with your domain
+- See `DEPLOYMENT-HISTORY.md` for full production setup
+
 ### Backend Configuration (`backend/.env`)
 
 ```env
