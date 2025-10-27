@@ -83,8 +83,8 @@ async def websocket_positions(websocket: WebSocket):
         # Keep connection alive and send updates periodically
         while True:
             try:
-                # Wait for 30 seconds
-                await asyncio.sleep(30)
+                # Wait for 1 second (ultra real-time updates!)
+                await asyncio.sleep(1)
                 
                 # Get fresh database session for updates
                 db = SessionLocal()

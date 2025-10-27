@@ -113,10 +113,10 @@ function App() {
               />
               <button
                 onClick={() => setEoAnalyzerOpen(true)}
-                className="flex items-center space-x-2 bg-space-700 hover:bg-space-600 text-white px-4 py-2 rounded-lg transition-colors"
+                className="flex items-center space-x-1.5 bg-white/5 backdrop-blur-sm hover:bg-white/10 text-white px-3 py-1.5 rounded-lg transition-all border border-white/10 text-sm"
               >
-                <SatelliteIcon className="w-4 h-4" />
-                <span className="text-sm">EO Analysis</span>
+                <SatelliteIcon className="w-3.5 h-3.5" />
+                <span>EO Analysis</span>
               </button>
             </div>
           )}
