@@ -32,23 +32,25 @@ body {
   display: none !important;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - sleeker glass style */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1f2e;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #303746;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  backdrop-filter: blur(10px);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3d4451;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Animations */
@@ -76,6 +78,26 @@ body {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Glass panel utilities */
+.glass-panel {
+  backdrop-filter: blur(20px);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-light {
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
 
 

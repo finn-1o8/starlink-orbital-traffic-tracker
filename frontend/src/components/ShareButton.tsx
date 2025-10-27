@@ -50,10 +50,10 @@ function ShareButton({ viewState, className = '' }: ShareButtonProps) {
     <div className={`relative ${className}`}>
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center space-x-2 bg-space-700 hover:bg-space-600 text-white px-4 py-2 rounded-lg transition-colors"
+        className="flex items-center space-x-1.5 bg-white/5 backdrop-blur-sm hover:bg-white/10 text-white px-3 py-1.5 rounded-lg transition-all border border-white/10 text-sm"
       >
-        <Share2 className="w-4 h-4" />
-        <span className="text-sm">Share</span>
+        <Share2 className="w-3.5 h-3.5" />
+        <span>Share</span>
       </button>
 
       {showMenu && (
@@ -65,19 +65,19 @@ function ShareButton({ viewState, className = '' }: ShareButtonProps) {
           />
 
           {/* Menu */}
-          <div className="absolute right-0 mt-2 w-64 bg-space-700 border border-space-600 rounded-lg shadow-xl z-50 animate-fade-in">
-            <div className="p-2 space-y-1">
+          <div className="absolute right-0 mt-2 w-56 backdrop-blur-xl bg-black/40 border border-white/20 rounded-lg shadow-2xl z-50 animate-fade-in">
+            <div className="p-2 space-y-0.5">
               {/* Copy Link */}
               <button
                 onClick={handleCopyLink}
-                className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-space-600 rounded text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"
               >
                 {copied ? (
-                  <Check className="w-4 h-4 text-accent-green" />
+                  <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (
-                  <Copy className="w-4 h-4 text-gray-400" />
+                  <Copy className="w-3.5 h-3.5 text-gray-400" />
                 )}
-                <span className="text-sm text-white">
+                <span className="text-xs text-white">
                   {copied ? 'Copied!' : 'Copy Link'}
                 </span>
               </button>
@@ -86,38 +86,38 @@ function ShareButton({ viewState, className = '' }: ShareButtonProps) {
               {navigator.share && (
                 <button
                   onClick={handleNativeShare}
-                  className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-space-600 rounded text-left transition-colors"
+                  className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"
                 >
-                  <Share2 className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-white">Share...</span>
+                  <Share2 className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-xs text-white">Share...</span>
                 </button>
               )}
 
-              <div className="border-t border-space-600 my-2" />
+              <div className="border-t border-white/10 my-1.5" />
 
               {/* Social Media */}
               <button
                 onClick={() => handleSocialShare(getTwitterShareUrl(shareText, shareUrl))}
-                className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-space-600 rounded text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"
               >
-                <Twitter className="w-4 h-4 text-[#1DA1F2]" />
-                <span className="text-sm text-white">Share on Twitter</span>
+                <Twitter className="w-3.5 h-3.5 text-[#1DA1F2]" />
+                <span className="text-xs text-white">Share on Twitter</span>
               </button>
 
               <button
                 onClick={() => handleSocialShare(getLinkedInShareUrl(shareUrl))}
-                className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-space-600 rounded text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"
               >
-                <Linkedin className="w-4 h-4 text-[#0077B5]" />
-                <span className="text-sm text-white">Share on LinkedIn</span>
+                <Linkedin className="w-3.5 h-3.5 text-[#0077B5]" />
+                <span className="text-xs text-white">Share on LinkedIn</span>
               </button>
 
               <button
                 onClick={() => handleSocialShare(getFacebookShareUrl(shareUrl))}
-                className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-space-600 rounded text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"
               >
-                <Facebook className="w-4 h-4 text-[#1877F2]" />
-                <span className="text-sm text-white">Share on Facebook</span>
+                <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
+                <span className="text-xs text-white">Share on Facebook</span>
               </button>
             </div>
           </div>

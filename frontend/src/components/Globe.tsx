@@ -20,6 +20,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const satelliteEntitiesRef = useRef<Map<number, any>>(new Map());
   const orbitEntityRef = useRef<any>(null);
+  const [enableRotation, setEnableRotation] = useState(false);
 
   // Initialize Cesium Viewer
   useEffect(() => {
@@ -49,6 +50,10 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
 
     // Enable lighting
     viewer.scene.globe.enableLighting = true;
+
+    // Enable real-time clock animation for smooth satellite movement
+    viewer.clock.shouldAnimate = true;
+    viewer.clock.multiplier = 1; // Real-time speed
 
     // Handle click events
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -98,8 +103,9 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
       const pixelSize = isSelected ? 10 : 6;
 
       if (entity) {
-        // Update existing entity
+        // Direct position update - simple and reliable
         entity.position = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
+        
         if (entity.point) {
           entity.point.pixelSize = pixelSize;
           entity.point.color = color;

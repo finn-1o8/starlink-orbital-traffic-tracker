@@ -12,44 +12,44 @@ interface HeaderProps {
 
 function Header({ satelliteCount, wsConnected, onToggleDashboard }: HeaderProps) {
   return (
-    <header className="bg-space-800 border-b border-space-700 px-6 py-4">
+    <header className="backdrop-blur-xl bg-black/20 border-b border-white/10 px-5 py-3 shadow-xl">
       <div className="flex items-center justify-between">
         {/* Logo and Title */}
-        <div className="flex items-center space-x-3">
-          <Satellite className="w-8 h-8 text-accent-cyan" />
+        <div className="flex items-center space-x-2.5">
+          <Satellite className="w-6 h-6 text-cyan-400" />
           <div>
-            <h1 className="text-xl font-semibold text-white">
+            <h1 className="text-base font-semibold text-white">
               Orbital Traffic Impact Analyzer
             </h1>
-            <p className="text-sm text-gray-400">
+            <p className="text-[10px] text-gray-400">
               Real-time Starlink Constellation Tracking
             </p>
           </div>
         </div>
 
         {/* Stats and Controls */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-3">
           {/* Satellite Count */}
-          <div className="flex items-center space-x-2 bg-space-700 px-4 py-2 rounded-lg">
-            <Activity className="w-5 h-5 text-accent-cyan" />
+          <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/10">
+            <Activity className="w-4 h-4 text-cyan-400" />
             <div>
-              <div className="text-xs text-gray-400">Tracking</div>
-              <div className="text-lg font-semibold text-white font-mono">
+              <div className="text-[9px] text-gray-400 uppercase tracking-wide">Tracking</div>
+              <div className="text-sm font-semibold text-white font-mono">
                 {satelliteCount.toLocaleString()}
               </div>
             </div>
           </div>
 
           {/* Connection Status */}
-          <div className="flex items-center space-x-2 bg-space-700 px-4 py-2 rounded-lg">
+          <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/10">
             <div
-              className={`w-2 h-2 rounded-full ${
-                wsConnected ? 'bg-accent-green animate-pulse' : 'bg-accent-red'
+              className={`w-1.5 h-1.5 rounded-full ${
+                wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
               }`}
             />
             <div>
-              <div className="text-xs text-gray-400">Status</div>
-              <div className="text-sm font-medium text-white">
+              <div className="text-[9px] text-gray-400 uppercase tracking-wide">Status</div>
+              <div className="text-xs font-medium text-white">
                 {wsConnected ? 'Live' : 'Offline'}
               </div>
             </div>
@@ -58,9 +58,9 @@ function Header({ satelliteCount, wsConnected, onToggleDashboard }: HeaderProps)
           {/* Dashboard Toggle */}
           <button
             onClick={onToggleDashboard}
-            className="flex items-center space-x-2 bg-accent-cyan text-space-900 px-4 py-2 rounded-lg hover:bg-cyan-400 transition-colors font-medium"
+            className="flex items-center space-x-1.5 bg-cyan-400/20 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-400/30 transition-all font-medium border border-cyan-400/30 backdrop-blur-sm text-sm"
           >
-            <BarChart3 className="w-5 h-5" />
+            <BarChart3 className="w-4 h-4" />
             <span>Analytics</span>
           </button>
         </div>
