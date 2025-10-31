@@ -14,12 +14,28 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: #0f1419;
   color: #e6e8eb;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+  overscroll-behavior: none;
+}
+
+body::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+html {
+  overscroll-behavior-x: none;
+  overscroll-behavior: none;
 }
 
 #root {
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 /* Cesium Container */
@@ -100,4 +116,69 @@ body {
   transition-duration: 150ms;
 }
 
+/* Landing Page Animations */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
 
+@keyframes float {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(20px);
+    opacity: 0;
+  }
+}
+
+.animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float linear infinite;
+}
+
+/* Orbit rotation animation for project circles */
+@keyframes orbit {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-orbit {
+  animation: orbit 30s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+/* Counter-rotate text inside circles to keep it upright */
+@keyframes counter-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.animate-counter-orbit {
+  animation: counter-orbit 30s linear infinite;
+  transform-origin: center center;
+}
