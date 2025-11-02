@@ -10,7 +10,7 @@ import ShareButton from './ShareButton';
 import { satelliteApi, createWebSocket } from '../services/api';
 import { decodeViewState } from '../utils/share';
 import type { SatellitePosition } from '../types';
-import { Satellite as SatelliteIcon, ArrowLeft } from 'lucide-react';
+import { Satellite as SatelliteIcon } from 'lucide-react';
 
 function StarlinkTracker() {
   const [positions, setPositions] = useState<SatellitePosition[]>([]);
@@ -70,15 +70,6 @@ function StarlinkTracker() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-space-900">
-      {/* Back Button */}
-      <Link
-        to="/"
-        className="absolute top-4 left-4 z-50 flex items-center space-x-2 backdrop-blur-xl bg-black/20 hover:bg-black/30 text-gray-300 hover:text-cyan-400 px-4 py-2 rounded-lg border border-white/10 transition-all"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm">Back to Labs</span>
-      </Link>
-
       {/* Header */}
       <Header 
         satelliteCount={positions.length}

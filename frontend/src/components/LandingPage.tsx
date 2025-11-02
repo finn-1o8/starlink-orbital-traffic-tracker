@@ -4,7 +4,287 @@
  */
 import { useNavigate, Link } from 'react-router-dom';
 import { Satellite, Rocket, Code2, Mail, Github } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// Background Stars Component - with dynamic connections
+const BackgroundStars = () => {
+  // Use ref to ensure positions are only calculated once, never regenerated
+  const starPositionsRef = React.useRef<Array<{
+    id: number;
+    left: number;
+    top: number;
+    delay: number;
+    opacity: number;
+  }>>();
+  
+  // Dynamic connections that regenerate periodically
+  const [connections, setConnections] = useState<Array<{
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    delay: number;
+    id: string;
+  }>>([]);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const [isFadingIn, setIsFadingIn] = useState(false);
+  const [oldConnections, setOldConnections] = useState<Array<{
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    delay: number;
+    id: string;
+    fadeOutKey: number; // Unique key for each fade-out cycle to force animation restart
+  }>>([]);
+  
+  // Generate new connections periodically
+  useEffect(() => {
+    if (!starPositionsRef.current) {
+      starPositionsRef.current = Array.from({ length: 50 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        top: Math.random() * 100,
+        delay: Math.random() * 3,
+        opacity: Math.random() * 0.8 + 0.2,
+      }));
+    }
+    
+    const generateConnections = () => {
+      if (!starPositionsRef.current) return;
+      
+      const newConnections: Array<{
+        from: { x: number; y: number };
+        to: { x: number; y: number };
+        delay: number;
+        id: string;
+      }> = [];
+      
+      const maxConnectionDistance = 30; // 30% of viewport
+      const connectionProbability = 0.15; // Only 15% chance of connecting any two nearby stars
+      
+      starPositionsRef.current.forEach((star, i) => {
+        starPositionsRef.current!.forEach((otherStar, j) => {
+          if (i >= j) return; // Avoid duplicates
+          
+          const distance = Math.sqrt(
+            Math.pow(star.left - otherStar.left, 2) + 
+            Math.pow(star.top - otherStar.top, 2)
+          );
+          
+          // Only connect if within distance AND random chance
+          if (distance <= maxConnectionDistance && Math.random() < connectionProbability) {
+            newConnections.push({
+              from: { x: star.left, y: star.top },
+              to: { x: otherStar.left, y: otherStar.top },
+              delay: Math.random() * 2,
+              id: `${star.left}-${star.top}-${otherStar.left}-${otherStar.top}`,
+            });
+          }
+        });
+      });
+      
+      // IMPORTANT: Copy current connections BEFORE any state changes
+      // This preserves them for the fade-out animation
+      const currentConnections = [...connections];
+      
+      if (currentConnections.length > 0) {
+        // Move existing connections to oldConnections array for fade-out
+        // Add unique fadeOutKey to force React to treat these as new elements (restarts animation)
+        const fadeOutKey = Date.now();
+        const connectionsToFadeOut = currentConnections.map(conn => ({
+          ...conn,
+          fadeOutKey: fadeOutKey
+        }));
+        setOldConnections(connectionsToFadeOut);
+        setIsFadingOut(true);
+        
+        // Clear current connections array immediately (so they stop pulsing)
+        setConnections([]);
+        
+        // Wait for fade out to complete (4 seconds), then remove old connections from DOM
+        setTimeout(() => {
+          // Remove old connections from DOM after fade-out animation fully completes
+          setOldConnections([]);
+          setIsFadingOut(false);
+          
+          // Small delay before starting fade-in for new connections
+          setTimeout(() => {
+            setIsFadingIn(true);
+            setConnections(newConnections);
+            
+            // After fade-in completes (4 seconds), connections switch to pulse animation
+            setTimeout(() => {
+              setIsFadingIn(false);
+            }, 4000);
+          }, 100);
+        }, 4000); // Wait full 4 seconds for fade-out animation to complete
+      } else {
+        // No existing connections, just fade in new ones directly
+        setIsFadingIn(true);
+        setConnections(newConnections);
+        setTimeout(() => {
+          setIsFadingIn(false);
+        }, 4000);
+      }
+    };
+    
+    // Generate initial connections - start with fade-in
+    const generateInitial = () => {
+      if (!starPositionsRef.current) return;
+      
+      const initialConnections: Array<{
+        from: { x: number; y: number };
+        to: { x: number; y: number };
+        delay: number;
+        id: string;
+      }> = [];
+      
+      const maxConnectionDistance = 30;
+      const connectionProbability = 0.15;
+      
+      starPositionsRef.current.forEach((star, i) => {
+        starPositionsRef.current!.forEach((otherStar, j) => {
+          if (i >= j) return;
+          
+          const distance = Math.sqrt(
+            Math.pow(star.left - otherStar.left, 2) + 
+            Math.pow(star.top - otherStar.top, 2)
+          );
+          
+          if (distance <= maxConnectionDistance && Math.random() < connectionProbability) {
+            initialConnections.push({
+              from: { x: star.left, y: star.top },
+              to: { x: otherStar.left, y: otherStar.top },
+              delay: Math.random() * 2,
+              id: `${star.left}-${star.top}-${otherStar.left}-${otherStar.top}`,
+            });
+          }
+        });
+      });
+      
+      setIsFadingIn(true);
+      setConnections(initialConnections);
+      setTimeout(() => {
+        setIsFadingIn(false);
+      }, 4000); // 4 seconds fade-in
+    };
+    
+    generateInitial();
+    
+    // Regenerate connections every 12 seconds (complete cycle: 4s fade-in, 4s visible, 4s fade-out)
+    // Important: This matches the animation timeline perfectly
+    // 0-4s: fade-in, 4-8s: visible, 8-12s: fade-out, then regenerate
+    const interval = setInterval(generateConnections, 12000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ willChange: 'auto', isolation: 'isolate' }}>
+      {/* Neural network connections - dynamically regenerated */}
+      <svg 
+        className="absolute inset-0 w-full h-full" 
+        style={{ pointerEvents: 'none', zIndex: 1 }}
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {/* Old connections fading out - these should visually fade out slowly */}
+        {oldConnections.map((connection, idx) => (
+          <line
+            key={`old-${connection.id}-${connection.fadeOutKey}-${idx}`}
+            x1={connection.from.x}
+            y1={connection.from.y}
+            x2={connection.to.x}
+            y2={connection.to.y}
+            stroke="rgba(255, 255, 255, 0.35)"
+            strokeWidth="0.153"
+            className="animate-neural-fade-out"
+            style={{
+              animationDelay: '0s',
+              strokeLinecap: 'round',
+            }}
+          />
+        ))}
+        
+        {/* New connections fading in or pulsing */}
+        {connections.map((connection, index) => (
+          <line
+            key={connection.id}
+            x1={connection.from.x}
+            y1={connection.from.y}
+            x2={connection.to.x}
+            y2={connection.to.y}
+            stroke="rgba(255, 255, 255, 0.35)"
+            strokeWidth="0.153"
+            className={
+              isFadingIn 
+                ? "animate-neural-fade-in-on-appear" 
+                : "animate-neural-pulse"
+            }
+            style={{
+              animationDelay: isFadingIn ? '0s' : '0s', // No delay - pulse starts immediately after fade-in
+              strokeLinecap: 'round',
+            }}
+          />
+        ))}
+      </svg>
+      
+      {/* Stars */}
+      {starPositionsRef.current && starPositionsRef.current.map((star) => (
+        <div
+          key={star.id}
+          className="absolute w-1 h-1 bg-white rounded-full animate-twinkle"
+          style={{
+            left: `${star.left}%`,
+            top: `${star.top}%`,
+            animationDelay: `${star.delay}s`,
+            opacity: star.opacity,
+            willChange: 'opacity, transform',
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+BackgroundStars.displayName = 'BackgroundStars';
+
+// Floating Particles Component - isolated to prevent re-renders
+const FloatingParticles = React.memo(() => {
+  // Use ref to ensure positions are only calculated once, never regenerated
+  const floatingParticlesRef = React.useRef<Array<{
+    id: number;
+    left: number;
+    top: number;
+    delay: number;
+    duration: number;
+  }>>();
+  
+  if (!floatingParticlesRef.current) {
+    floatingParticlesRef.current = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      delay: Math.random() * 5,
+      duration: Math.random() * 10 + 10,
+    }));
+  }
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ willChange: 'auto', isolation: 'isolate' }}>
+      {floatingParticlesRef.current.map((particle) => (
+        <div
+          key={particle.id}
+          className="absolute w-2 h-2 bg-cyan-400/30 rounded-full animate-float"
+          style={{
+            left: `${particle.left}%`,
+            top: `${particle.top}%`,
+            animationDelay: `${particle.delay}s`,
+            animationDuration: `${particle.duration}s`,
+            willChange: 'transform, opacity',
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+FloatingParticles.displayName = 'FloatingParticles';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -132,21 +412,8 @@ function LandingPage() {
         overscrollBehavior: 'none'
       }}
     >
-      {/* Animated background stars */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(50)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-twinkle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              opacity: Math.random() * 0.8 + 0.2,
-            }}
-          />
-        ))}
-      </div>
+      {/* Animated background stars - isolated component to prevent re-renders */}
+      <BackgroundStars />
 
       {/* Main Content */}
       <div className="relative z-10 text-center px-4 w-full flex flex-col items-center justify-between h-full py-3">
@@ -261,21 +528,8 @@ function LandingPage() {
         </div>
       </div>
 
-      {/* Floating particles */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-cyan-400/30 rounded-full animate-float"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${Math.random() * 10 + 10}s`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Floating particles - isolated component to prevent re-renders */}
+      <FloatingParticles />
     </div>
   );
 }

@@ -182,3 +182,64 @@ html {
   animation: counter-orbit 30s linear infinite;
   transform-origin: center center;
 }
+
+/* Neural network pulse animation for connections - completes the cycle after fade-in */
+/* Timeline: fade-in (4s to 60%) + stay visible (4s at 60%) + fade-out (4s to 0%) = 12s total */
+@keyframes neural-pulse {
+  0% {
+    opacity: 0.6; /* Start at 60% (connections are at 60% after fade-in) */
+  }
+  50% {
+    opacity: 0.6; /* Stay at 60% for first half (4s visible) */
+  }
+  100% {
+    opacity: 0; /* Fade out in second half (4s fade-out from 60% to 0%) */
+  }
+}
+
+/* Fade out animation for when connections are being replaced - slow fade from 60% to 0% */
+@keyframes neural-fade-out {
+  0% {
+    opacity: 0.6;
+    stroke-opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    stroke-opacity: 0;
+  }
+}
+
+/* Smooth fade-in for new connections - fade from 0% to 60% */
+@keyframes neural-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.6;
+  }
+}
+
+.animate-neural-pulse {
+  animation: neural-pulse 8s ease-in-out forwards;
+  stroke-opacity: 1;
+  animation-fill-mode: forwards;
+  opacity: 0.6; /* Ensure it starts at 60% after fade-in completes */
+}
+
+/* Fade-in animation when connections first appear - 4 seconds to reach 60% */
+.animate-neural-fade-in-on-appear {
+  animation: neural-fade-in 4s ease-in-out forwards;
+  opacity: 0;
+  stroke-opacity: 1;
+  animation-fill-mode: forwards; /* Keep final opacity (60%) after animation */
+}
+
+.animate-neural-fade-out {
+  animation: neural-fade-out 4s ease-in-out forwards !important;
+  opacity: 0.6 !important; /* Force start at 60% opacity, override any other state */
+  stroke-opacity: 0.6 !important; /* Force start at 60% stroke opacity */
+  pointer-events: none;
+  animation-fill-mode: forwards; /* Keep final state after animation */
+  /* Force reset any inline styles that might interfere */
+  animation-play-state: running !important;
+}
