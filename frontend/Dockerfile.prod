@@ -26,7 +26,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Create simple nginx config for SPA
 RUN echo 'server { \
     listen 80; \
-    root /usr/share/nginx/html; \
+    root /usr/share/nginx/html/tracker; \
     index index.html; \
     \
     # Enable gzip \
