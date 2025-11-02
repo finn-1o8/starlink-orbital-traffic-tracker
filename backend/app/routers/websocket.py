@@ -4,6 +4,7 @@ WebSocket endpoint for real-time satellite position updates
 import logging
 import asyncio
 import json
+import os
 from typing import Set
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
@@ -15,6 +16,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Allowed origins for WebSocket connections
+ALLOWED_ORIGINS = [
+    origin.strip() 
+    for origin in os.getenv(
+        "CORS_ORIGINS", 
+        "http://localhost:3000,http://localhost:3001,http://localhost:5173"
+    ).split(',')
+]
+
 
 class ConnectionManager:
     """Manages WebSocket connections."""
@@ -24,9 +34,23 @@ class ConnectionManager:
     
     async def connect(self, websocket: WebSocket):
         """Accept and register a new connection."""
-        await websocket.accept()
-        self.active_connections.add(websocket)
-        logger.info(f"Client connected. Total connections: {len(self.active_connections)}")
+        origin = websocket.headers.get("origin") or websocket.headers.get("Origin")
+        logger.info(f"WebSocket connection attempt from origin: {origin}")
+        
+        # Only reject if origin is explicitly provided and not in allowed list
+        # Accept connections without origin (some clients don't send it)
+        if origin and origin not in ALLOWED_ORIGINS:
+            logger.warning(f"Rejected WebSocket connection from origin: {origin} (not in {ALLOWED_ORIGINS})")
+            await websocket.close(code=1008, reason="Origin not allowed")
+            return
+        
+        try:
+            await websocket.accept()
+            self.active_connections.add(websocket)
+            logger.info(f"Client connected from {origin or 'unknown'}. Total connections: {len(self.active_connections)}")
+        except Exception as e:
+            logger.error(f"Failed to accept WebSocket connection: {e}")
+            raise
     
     def disconnect(self, websocket: WebSocket):
         """Remove a connection."""
