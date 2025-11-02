@@ -49,428 +49,98 @@ A cutting-edge web application that visualizes the Starlink satellite constellat
 
 **Infrastructure:**
 - Docker & Docker Compose
-- GitHub Actions CI/CD
-- Caddy reverse proxy (production)
-- Environment-based configuration
+- Caddy reverse proxy with automatic SSL
+- GitHub Actions for CI/CD
+- Hetzner cloud hosting
 
-## 🚀 Quick Deploy to Production
-
-For a professional production deployment to Hetzner with automatic CI/CD, see:
-
-📖 **[deployment/DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md)** - Complete deployment guide  
-⚡ **[deployment/QUICK_START.md](deployment/QUICK_START.md)** - Get deployed in 15 minutes  
-✅ **[deployment/CHECKLIST.md](deployment/CHECKLIST.md)** - Deployment checklist  
-🎯 **[deployment/NEXT_STEPS.md](deployment/NEXT_STEPS.md)** - Step-by-step instructions  
-
-## 📦 Installation
+## 🚀 Quick Start
 
 ### Prerequisites
+- Docker & Docker Compose
+- Node.js 20+ (for local development)
+- Python 3.11+ (for local development)
 
-- Docker & Docker Compose (recommended)
-- OR:
-  - Python 3.11+
-  - Node.js 20+
-  - PostgreSQL 15+
-  - Redis 7+
+### Local Development
 
-### Quick Start with Docker (Recommended)
-
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/orbital-traffic-analyzer.git
-cd orbital-traffic-analyzer
+# Clone repository
+git clone https://github.com/yourusername/Tracker.git
+cd Tracker
+
+# Start services
+docker compose up -d
+
+# Frontend: http://localhost:3001
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
 ```
 
-2. **Create environment files:**
+### Environment Variables
 
-Backend `.env`:
-```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env with your settings
-```
+Copy `env.example` files and configure:
+- `backend/env.example` → `backend/.env`
+- `frontend/env.example` → `frontend/.env`
 
-Frontend `.env`:
-```bash
-cp frontend/.env.example frontend/.env
-# Add your Cesium Ion token: https://ion.cesium.com/
-```
+See individual README files in `backend/` and `frontend/` for details.
 
-3. **Start all services:**
-```bash
-docker-compose up -d
-```
+## 📚 Documentation
 
-4. **Wait for initialization (first run takes ~2 minutes):**
-```bash
-docker-compose logs -f backend
-# Wait for "TLE update completed successfully"
-```
+- **[Deployment Guide](deployment/DEPLOYMENT.md)** - Production deployment on Hetzner
+- **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
 
-5. **Open your browser:**
-- Frontend: http://localhost:3000
-- API Documentation: http://localhost:8000/docs
+## 🌐 Production
 
-### Manual Installation
+**Live App:** https://karmanlab.org/tracker
 
-#### Backend Setup
+**Deployment:**
+- Automated via GitHub Actions
+- Server: Hetzner Cloud (135.181.254.130)
+- Reverse Proxy: Caddy (automatic SSL)
+- Database: PostgreSQL with TimescaleDB
+- Cache: Redis
 
-1. **Install Python dependencies:**
+## 🛠️ Development
+
+### Backend
+
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-2. **Setup PostgreSQL database:**
-```bash
-createdb orbital_tracker
-```
-
-3. **Configure environment:**
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
-
-4. **Start the backend:**
-```bash
 uvicorn app.main:app --reload
 ```
 
-#### Frontend Setup
+### Frontend
 
-1. **Install dependencies:**
 ```bash
 cd frontend
 npm install
-```
-
-2. **Configure environment:**
-```bash
-cp .env.example .env
-# Add your Cesium Ion token
-```
-
-3. **Start development server:**
-```bash
 npm run dev
-```
-
-## 🚀 Usage
-
-### Basic Usage
-
-1. **View Satellites**: The 3D globe automatically displays all tracked Starlink satellites
-2. **Select Satellite**: Click any satellite point to view details and orbit path
-3. **Filter by Altitude**: Use the sidebar to filter satellites by altitude band
-4. **Search**: Find specific satellites by name or NORAD ID
-5. **Analytics**: Click "Analytics" button to view constellation statistics
-
-### API Usage
-
-#### Get All Satellite Positions
-
-```bash
-curl http://localhost:8000/api/satellites/positions
-```
-
-Response:
-```json
-[
-  {
-    "satellite_id": 1,
-    "norad_id": 44713,
-    "name": "STARLINK-1007",
-    "lat": 45.123,
-    "lon": -93.456,
-    "alt_km": 550.2,
-    "velocity_km_s": 7.56,
-    "timestamp": "2025-10-25T10:30:00+00:00"
-  }
-]
-```
-
-#### Analyze Orbital Congestion
-
-```bash
-curl "http://localhost:8000/api/congestion?lat=40.7128&lon=-74.0060&radius_km=500&alt_min=500&alt_max=600"
-```
-
-Response:
-```json
-{
-  "total_satellites": 45,
-  "density_per_1000km3": 0.023,
-  "mean_spacing_km": 150.5,
-  "closest_approach_km": 12.3,
-  "timestamp": "2025-10-25T10:30:00+00:00"
-}
-```
-
-#### Get Satellite Orbit Path
-
-```bash
-curl http://localhost:8000/api/satellites/44713/orbit?duration=90
-```
-
-#### EO Interference Analysis
-
-```bash
-curl -X POST http://localhost:8000/api/eo-analysis \
-  -H "Content-Type: application/json" \
-  -d '{
-    "eo_preset": "sentinel-2a",
-    "target_region": {"lat": 40.7128, "lon": -74.0060, "radius_km": 100},
-    "duration_hours": 24
-  }'
-```
-
-### WebSocket Connection
-
-```javascript
-const ws = new WebSocket('ws://localhost:8000/api/ws/positions');
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log('Positions:', data.data);
-};
 ```
 
 ## 📊 API Endpoints
 
-### Satellites
-
 - `GET /api/satellites` - List all satellites
-- `GET /api/satellites/positions` - Get current positions
-- `GET /api/satellites/{norad_id}` - Get satellite info
-- `GET /api/satellites/{norad_id}/orbit` - Get orbit path
+- `GET /api/satellites/positions` - Real-time positions
+- `GET /api/satellites/{norad_id}/orbit` - Orbit path
+- `GET /api/congestion` - Congestion analysis
+- `GET /api/eo-analysis` - EO interference analysis
+- `WebSocket /api/ws/positions` - Live position updates
 
-### Congestion Analysis
+Full API documentation at `/docs` when running locally.
 
-- `GET /api/congestion` - Analyze regional congestion
-- `GET /api/congestion/heatmap` - Get global density heatmap
-- `GET /api/congestion/altitude-distribution` - Get altitude distribution
+## 📝 License
 
-### EO Analysis
-
-- `POST /api/eo-analysis` - Analyze EO interference
-- `GET /api/eo-analysis/presets` - Get available EO satellite presets
-
-### WebSocket
-
-- `WS /api/ws/positions` - Real-time position updates
-
-Full API documentation: http://localhost:8000/docs
-
-## 🎨 Screenshots
-
-### Main Interface
-![Main Interface](docs/screenshots/main-interface.png)
-*3D globe showing Starlink constellation with real-time tracking*
-
-### Analytics Dashboard
-![Analytics Dashboard](docs/screenshots/dashboard.png)
-*Constellation statistics and altitude distribution charts*
-
-### Satellite Details
-![Satellite Details](docs/screenshots/satellite-info.png)
-*Detailed satellite information with orbit visualization*
-
-## 🔧 Configuration
-
-### Development vs Production
-
-**Development:**
-- Use `docker-compose.yml` (includes dev tools, hot reload)
-- Environment: `backend/.env` and `frontend/.env`
-
-**Production:**
-- Use `docker-compose.prod.yml` (optimized, SSL-ready)
-- Copy `backend/env.example` to `backend/.env`
-- Copy `frontend/env.example` to `frontend/.env`
-- Configure `nginx.conf` with your domain
-- See `DEPLOYMENT-HISTORY.md` for full production setup
-
-### Backend Configuration (`backend/.env`)
-
-```env
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/orbital_tracker
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# API Settings
-API_HOST=0.0.0.0
-API_PORT=8000
-CORS_ORIGINS=http://localhost:3000
-
-# TLE Updates
-TLE_UPDATE_INTERVAL_HOURS=6
-POSITION_CACHE_SECONDS=30
-```
-
-### Frontend Configuration (`frontend/.env`)
-
-```env
-# API Endpoints
-VITE_API_URL=http://localhost:8000/api
-VITE_WS_URL=ws://localhost:8000/api
-
-# Cesium Ion Token (Required)
-VITE_CESIUM_ION_TOKEN=your_token_here
-
-# Feature Flags
-VITE_ENABLE_ANALYTICS=true
-VITE_ENABLE_HISTORICAL=true
-```
-
-### Getting Cesium Ion Token
-
-1. Create free account at https://ion.cesium.com/
-2. Navigate to "Access Tokens"
-3. Create new token or use default token
-4. Copy token to `VITE_CESIUM_ION_TOKEN`
-
-## 📈 Performance
-
-- **Backend**: Calculates 1000+ satellite positions in <5 seconds
-- **API Response Time**: <500ms (95th percentile)
-- **Frontend**: Maintains 30+ FPS with 1000+ rendered satellites
-- **WebSocket Updates**: Every 30 seconds
-- **TLE Updates**: Automatic every 6 hours
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
-cd backend
-pytest tests/ -v
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm run test
-```
-
-### End-to-End Tests
-
-```bash
-npm run test:e2e
-```
-
-## 🐛 Troubleshooting
-
-### Satellites Not Appearing
-
-1. Check backend logs: `docker-compose logs backend`
-2. Verify TLE data was fetched: Look for "TLE update completed successfully"
-3. Wait 2-3 minutes on first startup for initial data fetch
-
-### Cesium Not Loading
-
-1. Verify Cesium Ion token is set in `frontend/.env`
-2. Check browser console for errors
-3. Ensure token has access to required assets
-
-### WebSocket Connection Failed
-
-1. Verify backend is running: `curl http://localhost:8000/api/health`
-2. Check CORS settings in `backend/.env`
-3. Try fallback polling mode (positions refresh every 30s via HTTP)
-
-### Database Connection Error
-
-1. Ensure PostgreSQL is running: `docker-compose ps`
-2. Check credentials in `.env` file
-3. Reset database: `docker-compose down -v && docker-compose up -d`
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow PEP 8 for Python code
-- Use TypeScript strict mode
-- Add tests for new features
-- Update documentation
-- Keep commits atomic and well-described
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **CelesTrak** for providing TLE data
-- **Cesium** for the amazing 3D globe engine
-- **Skyfield** for orbital mechanics calculations
-- **FastAPI** for the excellent Python web framework
-- **Starlink** constellation data from SpaceX/CelesTrak
-
-## 📚 Resources
-
-### Documentation
-- [Cesium.js Documentation](https://cesium.com/learn/)
-- [Skyfield Documentation](https://rhodesmill.org/skyfield/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-
-### Data Sources
-- [CelesTrak - Starlink TLEs](https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle)
-- [Space-Track.org](https://www.space-track.org/)
-
-### Similar Projects
-- [Stuff in Space](http://stuffin.space/)
-- [SatFlare](https://www.satflare.com/)
-- [N2YO](https://www.n2yo.com/)
-
-## 📞 Contact
-
-- **Project Link**: https://github.com/yourusername/orbital-traffic-analyzer
-- **Issues**: https://github.com/yourusername/orbital-traffic-analyzer/issues
-- **Discussions**: https://github.com/yourusername/orbital-traffic-analyzer/discussions
-
-## 🗺️ Roadmap
-
-### Phase 1 (Current)
-- ✅ Real-time 3D visualization
-- ✅ Satellite tracking and orbit paths
-- ✅ Basic congestion analysis
-- ✅ WebSocket live updates
-- ✅ Analytics dashboard
-
-### Phase 2 (Q1 2026)
-- [ ] Historical playback (time machine)
-- [ ] Advanced EO interference analysis with FOV cone visualization
-- [ ] Ground station coverage calculator
-- [ ] Collision risk assessment
-- [ ] Mobile responsive design
-
-### Phase 3 (Q2 2026)
-- [ ] User accounts and saved analyses
-- [ ] PDF report generation
-- [ ] Social sharing features
-- [ ] Multi-constellation support (OneWeb, Amazon Kuiper)
-- [ ] Predictive analytics and forecasting
-
-### Phase 4 (Future)
-- [ ] Machine learning for interference prediction
-- [ ] Real-time conjunction alerts
-- [ ] Integration with telescope scheduling systems
-- [ ] Public API with rate limiting and authentication
+- Cesium.js for 3D globe visualization
+- Space-Track.org for TLE data
+- Starlink for the inspiration
 
 ---
 
-**Built with ❤️ for the space community**
-
-Last Updated: October 25, 2025
-
+**Status:** ✅ Production-ready  
+**Last Updated:** November 2025
