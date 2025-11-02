@@ -3,7 +3,6 @@
  * Top navigation bar with logo, stats, and controls
  */
 import { Satellite, Activity, BarChart3, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   satelliteCount: number;
@@ -18,13 +17,13 @@ function Header({ satelliteCount, wsConnected, onToggleDashboard }: HeaderProps)
         {/* Left side: Back button and Title */}
         <div className="flex items-center space-x-4">
           {/* Back Button */}
-          <Link
-            to="/"
+          <a
+            href="https://karmanlab.org"
             className="flex items-center space-x-2 backdrop-blur-xl bg-black/20 hover:bg-black/30 text-gray-300 hover:text-cyan-400 px-4 py-2 rounded-lg border border-white/10 transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back to Labs</span>
-          </Link>
+          </a>
 
           {/* Logo and Title */}
           <div className="flex items-center space-x-2.5">
