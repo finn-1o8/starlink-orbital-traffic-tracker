@@ -1,11 +1,8 @@
 # Main domain - Landing page
 karmanlab.org, www.karmanlab.org {
-    reverse_proxy landing:80 {
-        header_up Host {host}
-    }
-    
-    # Tracker routes
+    # Tracker routes - strip /tracker prefix before forwarding
     handle /tracker* {
+        uri strip_prefix /tracker
         reverse_proxy tracker-frontend:80 {
             header_up Host {host}
         }
@@ -16,6 +13,11 @@ karmanlab.org, www.karmanlab.org {
         reverse_proxy tracker-backend:8000 {
             header_up Host {host}
         }
+    }
+    
+    # Default landing page
+    reverse_proxy landing:80 {
+        header_up Host {host}
     }
     
     # WebSocket support
@@ -34,29 +36,4 @@ karmanlab.org, www.karmanlab.org {
     }
 }
 
-# Optional: Separate subdomain for tracker
-tracker.karmanlab.org {
-    reverse_proxy tracker-frontend:80 {
-        header_up Host {host}
-    }
-    
-    handle /api* {
-        reverse_proxy tracker-backend:8000 {
-            header_up Host {host}
-        }
-    }
-    
-    handle /ws* {
-        reverse_proxy tracker-backend:8000 {
-            header_up Host {host}
-        }
-    }
-    
-    header {
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        X-XSS-Protection "1; mode=block"
-        Referrer-Policy no-referrer-when-downgrade
-    }
-}
 

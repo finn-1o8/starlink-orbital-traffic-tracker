@@ -4,6 +4,7 @@ import cesium from 'vite-plugin-cesium'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/tracker/',
   plugins: [react(), cesium()],
   server: {
     host: '0.0.0.0',
