@@ -8,50 +8,118 @@ import React, { useState, useEffect } from 'react';
 
 // Background Stars Component - with dynamic connections
 const BackgroundStars = () => {
-  // Use ref to ensure positions are only calculated once, never regenerated
-  const starPositionsRef = React.useRef<Array<{
+  // Use ref to ensure center positions are only calculated once, never regenerated
+  const starCentersRef = React.useRef<Array<{
+    id: number;
+    centerX: number; // Center point X for circular motion
+    centerY: number; // Center point Y for circular motion
+    radius: number; // Radius of circular motion
+    speed: number; // Speed of rotation (radians per second)
+    phase: number; // Initial phase offset
+    delay: number;
+    opacity: number;
+  }>>();
+  
+  // Current positions of stars (updated in real-time for circular motion)
+  const [starPositions, setStarPositions] = useState<Array<{
     id: number;
     left: number;
     top: number;
     delay: number;
     opacity: number;
-  }>>();
+  }>>([]);
   
   // Dynamic connections that regenerate periodically
   const [connections, setConnections] = useState<Array<{
-    from: { x: number; y: number };
-    to: { x: number; y: number };
+    fromStarId: number;
+    toStarId: number;
     delay: number;
     id: string;
   }>>([]);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isFadingIn, setIsFadingIn] = useState(false);
   const [oldConnections, setOldConnections] = useState<Array<{
-    from: { x: number; y: number };
-    to: { x: number; y: number };
+    fromStarId: number;
+    toStarId: number;
     delay: number;
     id: string;
     fadeOutKey: number; // Unique key for each fade-out cycle to force animation restart
   }>>([]);
   
-  // Generate new connections periodically
+  // Initialize star centers and start circular motion animation
   useEffect(() => {
-    if (!starPositionsRef.current) {
-      starPositionsRef.current = Array.from({ length: 50 }, (_, i) => ({
+    if (!starCentersRef.current) {
+      starCentersRef.current = Array.from({ length: 50 }, (_, i) => ({
         id: i,
-        left: Math.random() * 100,
-        top: Math.random() * 100,
+        centerX: Math.random() * 100,
+        centerY: Math.random() * 100,
+        radius: 0.5 + Math.random() * 1.5, // Small circular radius (0.5% to 2% of viewport)
+        speed: 0.15 + Math.random() * 0.15, // Slow speed (0.15 to 0.3 rad/s, ~20-40 seconds per full rotation)
+        phase: Math.random() * Math.PI * 2, // Random starting position in circle
         delay: Math.random() * 3,
         opacity: Math.random() * 0.8 + 0.2,
       }));
+      
+      // Initialize positions
+      const initialPositions = starCentersRef.current.map(star => ({
+        id: star.id,
+        left: star.centerX + Math.cos(star.phase) * star.radius,
+        top: star.centerY + Math.sin(star.phase) * star.radius,
+        delay: star.delay,
+        opacity: star.opacity,
+      }));
+      setStarPositions(initialPositions);
     }
     
+    // Animate stars in circular motion
+    let animationFrameId: number;
+    let lastTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      if (!starCentersRef.current) return;
+      
+      const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+      lastTime = currentTime;
+      
+      const newPositions = starCentersRef.current.map(star => {
+        // Calculate new position based on circular motion
+        // Speed is in radians per second, multiply by deltaTime (in seconds) to get angle change
+        const angleChange = star.speed * deltaTime;
+        const currentAngle = star.phase + angleChange;
+        star.phase = currentAngle % (Math.PI * 2); // Keep phase in 0-2π range to prevent overflow
+        
+        return {
+          id: star.id,
+          left: star.centerX + Math.cos(currentAngle) * star.radius,
+          top: star.centerY + Math.sin(currentAngle) * star.radius,
+          delay: star.delay,
+          opacity: star.opacity,
+        };
+      });
+      
+      setStarPositions(newPositions);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, []);
+  
+  // Generate new connections periodically
+  useEffect(() => {
+    if (!starCentersRef.current || starPositions.length === 0) return;
+    
     const generateConnections = () => {
-      if (!starPositionsRef.current) return;
+      if (starPositions.length === 0) return;
       
       const newConnections: Array<{
-        from: { x: number; y: number };
-        to: { x: number; y: number };
+        fromStarId: number;
+        toStarId: number;
         delay: number;
         id: string;
       }> = [];
@@ -59,8 +127,8 @@ const BackgroundStars = () => {
       const maxConnectionDistance = 30; // 30% of viewport
       const connectionProbability = 0.15; // Only 15% chance of connecting any two nearby stars
       
-      starPositionsRef.current.forEach((star, i) => {
-        starPositionsRef.current!.forEach((otherStar, j) => {
+      starPositions.forEach((star, i) => {
+        starPositions.forEach((otherStar, j) => {
           if (i >= j) return; // Avoid duplicates
           
           const distance = Math.sqrt(
@@ -71,10 +139,10 @@ const BackgroundStars = () => {
           // Only connect if within distance AND random chance
           if (distance <= maxConnectionDistance && Math.random() < connectionProbability) {
             newConnections.push({
-              from: { x: star.left, y: star.top },
-              to: { x: otherStar.left, y: otherStar.top },
+              fromStarId: star.id,
+              toStarId: otherStar.id,
               delay: Math.random() * 2,
-              id: `${star.left}-${star.top}-${otherStar.left}-${otherStar.top}`,
+              id: `${star.id}-${otherStar.id}-${Date.now()}`,
             });
           }
         });
@@ -127,11 +195,11 @@ const BackgroundStars = () => {
     
     // Generate initial connections - start with fade-in
     const generateInitial = () => {
-      if (!starPositionsRef.current) return;
+      if (starPositions.length === 0) return;
       
       const initialConnections: Array<{
-        from: { x: number; y: number };
-        to: { x: number; y: number };
+        fromStarId: number;
+        toStarId: number;
         delay: number;
         id: string;
       }> = [];
@@ -139,8 +207,8 @@ const BackgroundStars = () => {
       const maxConnectionDistance = 30;
       const connectionProbability = 0.15;
       
-      starPositionsRef.current.forEach((star, i) => {
-        starPositionsRef.current!.forEach((otherStar, j) => {
+      starPositions.forEach((star, i) => {
+        starPositions.forEach((otherStar, j) => {
           if (i >= j) return;
           
           const distance = Math.sqrt(
@@ -150,10 +218,10 @@ const BackgroundStars = () => {
           
           if (distance <= maxConnectionDistance && Math.random() < connectionProbability) {
             initialConnections.push({
-              from: { x: star.left, y: star.top },
-              to: { x: otherStar.left, y: otherStar.top },
+              fromStarId: star.id,
+              toStarId: otherStar.id,
               delay: Math.random() * 2,
-              id: `${star.left}-${star.top}-${otherStar.left}-${otherStar.top}`,
+              id: `${star.id}-${otherStar.id}-${Date.now()}`,
             });
           }
         });
@@ -166,15 +234,25 @@ const BackgroundStars = () => {
       }, 4000); // 4 seconds fade-in
     };
     
-    generateInitial();
+    // Wait for star positions to be initialized before generating connections (only once)
+    let hasInitialized = false;
+    const initTimeout = setTimeout(() => {
+      if (starPositions.length > 0 && !hasInitialized) {
+        generateInitial();
+        hasInitialized = true;
+      }
+    }, 100);
     
     // Regenerate connections every 12 seconds (complete cycle: 4s fade-in, 4s visible, 4s fade-out)
     // Important: This matches the animation timeline perfectly
     // 0-4s: fade-in, 4-8s: visible, 8-12s: fade-out, then regenerate
     const interval = setInterval(generateConnections, 12000);
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearTimeout(initTimeout);
+      clearInterval(interval);
+    };
+  }, [starPositions.length]); // Only run when star positions array length changes (initialization)
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ willChange: 'auto', isolation: 'isolate' }}>
@@ -186,48 +264,60 @@ const BackgroundStars = () => {
         preserveAspectRatio="none"
       >
         {/* Old connections fading out - these should visually fade out slowly */}
-        {oldConnections.map((connection, idx) => (
-          <line
-            key={`old-${connection.id}-${connection.fadeOutKey}-${idx}`}
-            x1={connection.from.x}
-            y1={connection.from.y}
-            x2={connection.to.x}
-            y2={connection.to.y}
-            stroke="rgba(255, 255, 255, 0.35)"
-            strokeWidth="0.153"
-            className="animate-neural-fade-out"
-            style={{
-              animationDelay: '0s',
-              strokeLinecap: 'round',
-            }}
-          />
-        ))}
+        {oldConnections.map((connection, idx) => {
+          const fromStar = starPositions.find(s => s.id === connection.fromStarId);
+          const toStar = starPositions.find(s => s.id === connection.toStarId);
+          if (!fromStar || !toStar) return null;
+          
+          return (
+            <line
+              key={`old-${connection.id}-${connection.fadeOutKey}-${idx}`}
+              x1={fromStar.left}
+              y1={fromStar.top}
+              x2={toStar.left}
+              y2={toStar.top}
+              stroke="rgba(255, 255, 255, 0.35)"
+              strokeWidth="0.153"
+              className="animate-neural-fade-out"
+              style={{
+                animationDelay: '0s',
+                strokeLinecap: 'round',
+              }}
+            />
+          );
+        })}
         
         {/* New connections fading in or pulsing */}
-        {connections.map((connection, index) => (
-          <line
-            key={connection.id}
-            x1={connection.from.x}
-            y1={connection.from.y}
-            x2={connection.to.x}
-            y2={connection.to.y}
-            stroke="rgba(255, 255, 255, 0.35)"
-            strokeWidth="0.153"
-            className={
-              isFadingIn 
-                ? "animate-neural-fade-in-on-appear" 
-                : "animate-neural-pulse"
-            }
-            style={{
-              animationDelay: isFadingIn ? '0s' : '0s', // No delay - pulse starts immediately after fade-in
-              strokeLinecap: 'round',
-            }}
-          />
-        ))}
+        {connections.map((connection, index) => {
+          const fromStar = starPositions.find(s => s.id === connection.fromStarId);
+          const toStar = starPositions.find(s => s.id === connection.toStarId);
+          if (!fromStar || !toStar) return null;
+          
+          return (
+            <line
+              key={connection.id}
+              x1={fromStar.left}
+              y1={fromStar.top}
+              x2={toStar.left}
+              y2={toStar.top}
+              stroke="rgba(255, 255, 255, 0.35)"
+              strokeWidth="0.153"
+              className={
+                isFadingIn 
+                  ? "animate-neural-fade-in-on-appear" 
+                  : "animate-neural-pulse"
+              }
+              style={{
+                animationDelay: '0s',
+                strokeLinecap: 'round',
+              }}
+            />
+          );
+        })}
       </svg>
       
-      {/* Stars */}
-      {starPositionsRef.current && starPositionsRef.current.map((star) => (
+      {/* Stars - positions update in real-time for circular motion */}
+      {starPositions.map((star) => (
         <div
           key={star.id}
           className="absolute w-1 h-1 bg-white rounded-full animate-twinkle"
@@ -236,7 +326,8 @@ const BackgroundStars = () => {
             top: `${star.top}%`,
             animationDelay: `${star.delay}s`,
             opacity: star.opacity,
-            willChange: 'opacity, transform',
+            willChange: 'opacity, transform, left, top',
+            transition: 'none', // Disable CSS transitions, we animate via JS
           }}
         />
       ))}
@@ -271,8 +362,10 @@ const FloatingParticles = React.memo(() => {
       {floatingParticlesRef.current.map((particle) => (
         <div
           key={particle.id}
-          className="absolute w-2 h-2 bg-cyan-400/30 rounded-full animate-float"
+          className="absolute bg-cyan-400/30 rounded-full animate-float"
           style={{
+            width: '5.6px',
+            height: '5.6px',
             left: `${particle.left}%`,
             top: `${particle.top}%`,
             animationDelay: `${particle.delay}s`,
