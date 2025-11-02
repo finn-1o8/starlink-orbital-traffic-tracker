@@ -65,7 +65,13 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Login to GHCR
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Pull image from GHCR
+            docker pull ghcr.io/${{ github.repository }}-frontend:latest
+            # Tag with local name that docker-compose expects
+            docker tag ghcr.io/${{ github.repository }}-frontend:latest karmanlabs_tracker-frontend:latest
+            # Restart service
             cd /srv/karmanlabs
-            docker compose pull tracker-frontend
             docker compose up -d tracker-frontend
 
