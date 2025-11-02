@@ -46,8 +46,12 @@ function StarlinkTracker() {
         }
       },
       (error) => {
-        console.error('WebSocket error:', error);
+        // Error handling is done in createWebSocket with retry logic
         setWsConnected(false);
+      },
+      () => {
+        // On successful connection
+        setWsConnected(true);
       }
     );
 

@@ -55,6 +55,7 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
     viewer.clock.shouldAnimate = true;
     viewer.clock.multiplier = 1; // Real-time speed
 
+
     // Handle click events
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     handler.setInputAction((click: any) => {
@@ -83,7 +84,14 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
   // Update satellite positions
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || positions.length === 0) return;
+    console.log('Globe useEffect triggered:', { viewer: !!viewer, positionsCount: positions.length });
+    
+    if (!viewer || positions.length === 0) {
+      console.log('Globe: Skipping update - no viewer or no positions');
+      return;
+    }
+    
+    console.log('Globe: Processing positions, first satellite:', positions[0]);
 
     // Remove satellites that no longer exist
     const currentNoradIds = new Set(positions.map(p => p.norad_id));
@@ -105,22 +113,28 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
       if (entity) {
         // Direct position update - simple and reliable
         entity.position = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
+        entity.show = true;
         
         if (entity.point) {
           entity.point.pixelSize = pixelSize;
           entity.point.color = color;
+          entity.point.show = true;
         }
       } else {
         // Create new entity
+        const cartesian = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
+        
         entity = viewer.entities.add({
           id: `sat-${sat.norad_id}`,
-          position: Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000),
+          position: cartesian,
+          show: true,
           point: {
             pixelSize: pixelSize,
             color: color,
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 1,
             scaleByDistance: new Cesium.NearFarScalar(1.5e6, 2.0, 8.0e6, 0.5),
+            heightReference: Cesium.HeightReference.NONE,
           },
           label: {
             text: sat.name,

@@ -149,35 +149,90 @@ export const eoApi = {
 };
 
 /**
- * WebSocket connection for real-time updates
+ * WebSocket connection for real-time updates with automatic reconnection
  */
-export const createWebSocket = (onMessage: (data: any) => void, onError?: (error: Event) => void) => {
+export const createWebSocket = (
+  onMessage: (data: any) => void, 
+  onError?: (error: Event) => void,
+  onConnect?: () => void
+) => {
   const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api';
-  const ws = new WebSocket(`${WS_URL}/ws/positions`);
+  let ws: WebSocket | null = null;
+  let reconnectAttempts = 0;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  const maxReconnectAttempts = 5;
+  const initialReconnectDelay = 1000; // Start with 1 second
 
-  ws.onopen = () => {
-    console.log('[WebSocket] Connected');
-  };
-
-  ws.onmessage = (event) => {
+  const connect = () => {
     try {
-      const data = JSON.parse(event.data);
-      onMessage(data);
+      ws = new WebSocket(`${WS_URL}/ws/positions`);
+
+      ws.onopen = () => {
+        console.log('[WebSocket] Connected');
+        reconnectAttempts = 0; // Reset on successful connection
+        if (onConnect) onConnect();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onMessage(data);
+        } catch (error) {
+          console.error('[WebSocket] Failed to parse message:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        // Only log errors if not reconnecting (to reduce console noise)
+        if (reconnectAttempts === 0) {
+          console.warn('[WebSocket] Connection error, will retry...');
+        }
+        if (onError) onError(error);
+      };
+
+      ws.onclose = (event) => {
+        if (event.wasClean) {
+          console.log('[WebSocket] Connection closed cleanly');
+        } else {
+          // Connection lost, attempt to reconnect
+          if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = initialReconnectDelay * Math.pow(2, reconnectAttempts);
+            reconnectAttempts++;
+            console.log(`[WebSocket] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            reconnectTimeout = setTimeout(() => {
+              connect();
+            }, delay);
+          } else {
+            console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
+          }
+        }
+      };
     } catch (error) {
-      console.error('[WebSocket] Failed to parse message:', error);
+      console.error('[WebSocket] Failed to create connection:', error);
+      if (onError) onError(error as Event);
     }
   };
 
-  ws.onerror = (error) => {
-    console.error('[WebSocket] Error:', error);
-    if (onError) onError(error);
-  };
+  // Start initial connection
+  connect();
 
-  ws.onclose = () => {
-    console.log('[WebSocket] Disconnected');
+  // Return WebSocket with cleanup function
+  return {
+    close: () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    },
+    get readyState() {
+      return ws?.readyState ?? WebSocket.CLOSED;
+    }
   };
-
-  return ws;
 };
 
 export default api;
