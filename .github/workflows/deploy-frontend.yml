@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-frontend
+  IMAGE_NAME: ${{ github.repository_owner }}/tracker-frontend
 
 jobs:
   build-and-push:
@@ -69,9 +69,9 @@ jobs:
             # Login to GHCR
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             # Pull image from GHCR
-            docker pull ghcr.io/${{ github.repository }}-frontend:latest
+            docker pull ghcr.io/${{ github.repository_owner }}/tracker-frontend:latest
             # Tag with local name that docker-compose expects
-            docker tag ghcr.io/${{ github.repository }}-frontend:latest karmanlabs_tracker-frontend:latest
+            docker tag ghcr.io/${{ github.repository_owner }}/tracker-frontend:latest karmanlabs_tracker-frontend:latest
             # Restart service
             cd /srv/karmanlabs
             docker compose up -d tracker-frontend
