@@ -6,7 +6,6 @@ karmanlab.org, www.karmanlab.org {
     
     # Tracker routes
     handle /tracker* {
-        uri strip_prefix /tracker
         reverse_proxy tracker-frontend:80 {
             header_up Host {host}
         }
