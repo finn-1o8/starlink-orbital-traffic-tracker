@@ -25,6 +25,7 @@ function Header({ satelliteCount, wsConnected, onToggleDashboard }: HeaderProps)
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back to Labs</span>
+            {/* Auto-deploy test */}
           </button>
 
           {/* Logo and Title */}
