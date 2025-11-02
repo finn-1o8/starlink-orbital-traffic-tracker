@@ -49,8 +49,18 @@ A cutting-edge web application that visualizes the Starlink satellite constellat
 
 **Infrastructure:**
 - Docker & Docker Compose
-- Nginx (production)
+- GitHub Actions CI/CD
+- Caddy reverse proxy (production)
 - Environment-based configuration
+
+## 🚀 Quick Deploy to Production
+
+For a professional production deployment to Hetzner with automatic CI/CD, see:
+
+📖 **[deployment/DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md)** - Complete deployment guide  
+⚡ **[deployment/QUICK_START.md](deployment/QUICK_START.md)** - Get deployed in 15 minutes  
+✅ **[deployment/CHECKLIST.md](deployment/CHECKLIST.md)** - Deployment checklist  
+🎯 **[deployment/NEXT_STEPS.md](deployment/NEXT_STEPS.md)** - Step-by-step instructions  
 
 ## 📦 Installation
 
