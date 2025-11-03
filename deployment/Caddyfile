@@ -15,9 +15,9 @@ karmanlab.org, www.karmanlab.org {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
-            # Enable WebSocket upgrade
+            # Force HTTP/1.1 for WebSocket support and large responses
             transport http {
-                versions h2c 1.1
+                versions 1.1
             }
         }
     }
