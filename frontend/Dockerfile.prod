@@ -11,8 +11,11 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Set environment variable for build
+# Set environment variables for production build
 ENV SKIP_PREFLIGHT_CHECK=true
+ENV VITE_API_URL=/api
+ENV VITE_WS_URL=wss://karmanlab.org/api
+ENV VITE_CESIUM_ION_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZTNlMTc0OC1iYjkzLTRkZWYtOTJmZS1iMGE3NTJhMjMwMzciLCJpZCI6MzU0MDEyLCJpYXQiOjE3NjE0MzgxMTR9.FHPtMVfJrwVPrU8BfSsVaxGbfIWorLrmbSS6z683-as
 
 # Build application (with fallbacks)
 RUN npm run build -- --mode production || npm run build:prod || npx vite build

@@ -12,7 +12,9 @@ import type {
   EOAnalysisResult,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Use relative path for production (works with base path)
+// For production at /tracker, /api will resolve to https://karmanlab.org/api
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:8000/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -156,7 +158,8 @@ export const createWebSocket = (
   onError?: (error: Event) => void,
   onConnect?: () => void
 ) => {
-  const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api';
+  // Use secure WebSocket for production
+  const WS_URL = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://karmanlab.org/api' : 'ws://localhost:8000/api');
   let ws: WebSocket | null = null;
   let reconnectAttempts = 0;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
