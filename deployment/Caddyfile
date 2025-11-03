@@ -8,23 +8,23 @@ karmanlab.org, www.karmanlab.org {
         }
     }
     
-    # API routes
+    # API routes (includes WebSocket support)
     handle /api* {
         reverse_proxy tracker-backend:8000 {
             header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            # Enable WebSocket upgrade
+            transport http {
+                versions h2c 1.1
+            }
         }
     }
     
     # Default landing page
     reverse_proxy landing:80 {
         header_up Host {host}
-    }
-    
-    # WebSocket support
-    handle /ws* {
-        reverse_proxy tracker-backend:8000 {
-            header_up Host {host}
-        }
     }
     
     # Security headers
