@@ -12,10 +12,13 @@ RUN npm install
 COPY . .
 
 # Set environment variables for production build
+# Cesium Ion token must be provided as build argument:
+# docker build --build-arg CESIUM_ION_TOKEN=your_token_here -f Dockerfile.prod -t image-name .
+ARG CESIUM_ION_TOKEN
 ENV SKIP_PREFLIGHT_CHECK=true
 ENV VITE_API_URL=/api
 ENV VITE_WS_URL=wss://karmanlab.org/api
-ENV VITE_CESIUM_ION_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZTNlMTc0OC1iYjkzLTRkZWYtOTJmZS1iMGE3NTJhMjMwMzciLCJpZCI6MzU0MDEyLCJpYXQiOjE3NjE0MzgxMTR9.FHPtMVfJrwVPrU8BfSsVaxGbfIWorLrmbSS6z683-as
+ENV VITE_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
 
 # Build application (with fallbacks)
 RUN npm run build -- --mode production || npm run build:prod || npx vite build

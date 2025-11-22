@@ -24,14 +24,18 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Request interceptor for logging (development only)
 api.interceptors.request.use(
   (config) => {
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    if (import.meta.env.DEV) {
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    }
     return config;
   },
   (error) => {
-    console.error('[API] Request error:', error);
+    if (import.meta.env.DEV) {
+      console.error('[API] Request error:', error);
+    }
     return Promise.reject(error);
   }
 );
@@ -39,11 +43,16 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    console.log(`[API] Response from ${response.config.url}:`, response.status);
+    if (import.meta.env.DEV) {
+      console.log(`[API] Response from ${response.config.url}:`, response.status);
+    }
     return response;
   },
   (error) => {
-    console.error('[API] Response error:', error.response?.data || error.message);
+    // Always log errors, but use appropriate level
+    if (import.meta.env.DEV) {
+      console.error('[API] Response error:', error.response?.data || error.message);
+    }
     return Promise.reject(error);
   }
 );
@@ -171,7 +180,9 @@ export const createWebSocket = (
       ws = new WebSocket(`${WS_URL}/ws/positions`);
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected');
+        if (import.meta.env.DEV) {
+          console.log('[WebSocket] Connected');
+        }
         reconnectAttempts = 0; // Reset on successful connection
         if (onConnect) onConnect();
       };
@@ -181,13 +192,15 @@ export const createWebSocket = (
           const data = JSON.parse(event.data);
           onMessage(data);
         } catch (error) {
-          console.error('[WebSocket] Failed to parse message:', error);
+          if (import.meta.env.DEV) {
+            console.error('[WebSocket] Failed to parse message:', error);
+          }
         }
       };
 
       ws.onerror = (error) => {
         // Only log errors if not reconnecting (to reduce console noise)
-        if (reconnectAttempts === 0) {
+        if (import.meta.env.DEV && reconnectAttempts === 0) {
           console.warn('[WebSocket] Connection error, will retry...');
         }
         if (onError) onError(error);
@@ -195,24 +208,32 @@ export const createWebSocket = (
 
       ws.onclose = (event) => {
         if (event.wasClean) {
-          console.log('[WebSocket] Connection closed cleanly');
+          if (import.meta.env.DEV) {
+            console.log('[WebSocket] Connection closed cleanly');
+          }
         } else {
           // Connection lost, attempt to reconnect
           if (reconnectAttempts < maxReconnectAttempts) {
             const delay = initialReconnectDelay * Math.pow(2, reconnectAttempts);
             reconnectAttempts++;
-            console.log(`[WebSocket] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            if (import.meta.env.DEV) {
+              console.log(`[WebSocket] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            }
             
             reconnectTimeout = setTimeout(() => {
               connect();
             }, delay);
           } else {
-            console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
+            if (import.meta.env.DEV) {
+              console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
+            }
           }
         }
       };
     } catch (error) {
-      console.error('[WebSocket] Failed to create connection:', error);
+      if (import.meta.env.DEV) {
+        console.error('[WebSocket] Failed to create connection:', error);
+      }
       if (onError) onError(error as Event);
     }
   };

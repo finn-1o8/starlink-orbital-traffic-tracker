@@ -1,14 +1,20 @@
 version: '3.8'
 
+# For local development, create a .env file in the root directory with:
+# POSTGRES_DB=orbital_tracker
+# POSTGRES_USER=orbital_user
+# POSTGRES_PASSWORD=your_secure_password
+# CESIUM_ION_TOKEN=your_cesium_token_here
+
 services:
   # PostgreSQL Database
   postgres:
     image: timescale/timescaledb:latest-pg15
     container_name: orbital-postgres
     environment:
-      POSTGRES_DB: orbital_tracker
-      POSTGRES_USER: orbital_user
-      POSTGRES_PASSWORD: orbital_pass
+      POSTGRES_DB: ${POSTGRES_DB:-orbital_tracker}
+      POSTGRES_USER: ${POSTGRES_USER:-orbital_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbital_pass}
     ports:
       - "5432:5432"
     volumes:
@@ -45,7 +51,7 @@ services:
       dockerfile: Dockerfile
     container_name: orbital-backend
     environment:
-      DATABASE_URL: postgresql://orbital_user:orbital_pass@postgres:5432/orbital_tracker
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orbital_user}:${POSTGRES_PASSWORD:-orbital_pass}@postgres:5432/${POSTGRES_DB:-orbital_tracker}
       REDIS_URL: redis://redis:6379/0
       API_HOST: 0.0.0.0
       API_PORT: 8000
@@ -74,8 +80,8 @@ services:
       VITE_API_URL: http://localhost:8000/api
       VITE_WS_URL: ws://localhost:8000/api
       # Get your free Cesium Ion token at: https://ion.cesium.com/
-      # Replace 'your_cesium_token_here' with your actual token
-      VITE_CESIUM_ION_TOKEN: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZTNlMTc0OC1iYjkzLTRkZWYtOTJmZS1iMGE3NTJhMjMwMzciLCJpZCI6MzU0MDEyLCJpYXQiOjE3NjE0MzgxMTR9.FHPtMVfJrwVPrU8BfSsVaxGbfIWorLrmbSS6z683-as
+      # Set via environment variable or .env file
+      VITE_CESIUM_ION_TOKEN: ${CESIUM_ION_TOKEN:-}
     ports:
       - "3001:3000"
     depends_on:

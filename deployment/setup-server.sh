@@ -41,10 +41,12 @@ mkdir -p $PROJECT_DIR
 cd $PROJECT_DIR
 
 # Download deployment files
-echo "📥 Downloading deployment files..."
-curl -L -o docker-compose.yml https://raw.githubusercontent.com/finn-1o8/Tracker/main/deployment/docker-compose.yml
-curl -L -o Caddyfile https://raw.githubusercontent.com/finn-1o8/Tracker/main/deployment/Caddyfile
-curl -L -o env.template https://raw.githubusercontent.com/finn-1o8/Tracker/main/deployment/env.template
+# Set GITHUB_REPO environment variable to customize repository
+GITHUB_REPO=${GITHUB_REPO:-"yourusername/your-repo"}
+echo "📥 Downloading deployment files from ${GITHUB_REPO}..."
+curl -L -o docker-compose.yml https://raw.githubusercontent.com/${GITHUB_REPO}/main/deployment/docker-compose.yml
+curl -L -o Caddyfile https://raw.githubusercontent.com/${GITHUB_REPO}/main/deployment/Caddyfile
+curl -L -o env.template https://raw.githubusercontent.com/${GITHUB_REPO}/main/deployment/env.template
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
@@ -77,7 +79,7 @@ fi
 
 # Login to GHCR (optional, for manual pulls)
 echo "🔐 Login to GitHub Container Registry..."
-echo "   You may need to login manually with: echo \$GITHUB_TOKEN | docker login ghcr.io -u finn-1o8 --password-stdin"
+echo "   You may need to login manually with: echo \$GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin"
 echo "   Get token from: https://github.com/settings/tokens"
 
 # Pull initial images

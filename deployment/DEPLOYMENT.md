@@ -4,7 +4,7 @@ Complete deployment guide for the Orbital Traffic Impact Analyzer on Hetzner ser
 
 ## 📋 Overview
 
-**Server:** Hetzner 135.181.254.130  
+**Server:** Hetzner Cloud  
 **Deployment Directory:** `/srv/karmanlabs`  
 **Domain:** https://karmanlab.org/tracker
 
@@ -114,12 +114,12 @@ docker compose up -d
 
 ```bash
 # SSH to server
-ssh root@135.181.254.130
+ssh root@your-server-ip
 
 # Update code and rebuild
 cd /opt/karmanlabs/frontend
 git pull origin main
-docker build -f Dockerfile.prod -t karmanlabs_tracker-frontend:latest .
+docker build -f Dockerfile.prod --build-arg CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN} -t karmanlabs_tracker-frontend:latest .
 
 # Restart service
 cd /srv/karmanlabs

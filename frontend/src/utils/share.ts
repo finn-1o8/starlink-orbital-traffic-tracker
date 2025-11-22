@@ -76,7 +76,9 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
-    console.error('Failed to copy to clipboard:', error);
+    if (import.meta.env.DEV) {
+      console.error('Failed to copy to clipboard:', error);
+    }
     return false;
   }
 }
@@ -97,7 +99,9 @@ export async function shareNative(title: string, text: string, url: string): Pro
       // User cancelled, not an error
       return false;
     }
-    console.error('Failed to share:', error);
+    if (import.meta.env.DEV) {
+      console.error('Failed to share:', error);
+    }
     return false;
   }
 }
@@ -140,7 +144,9 @@ export function captureScreenshot(canvas: HTMLCanvasElement): string | null {
   try {
     return canvas.toDataURL('image/png');
   } catch (error) {
-    console.error('Failed to capture screenshot:', error);
+    if (import.meta.env.DEV) {
+      console.error('Failed to capture screenshot:', error);
+    }
     return null;
   }
 }

@@ -39,7 +39,7 @@ echo -e "${WHITE}  4. Copy your default token${NC}"
 echo ""
 
 # Prompt for Cesium token
-read -p "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZTNlMTc0OC1iYjkzLTRkZWYtOTJmZS1iMGE3NTJhMjMwMzciLCJpZCI6MzU0MDEyLCJpYXQiOjE3NjE0MzgxMTR9.FHPtMVfJrwVPrU8BfSsVaxGbfIWorLrmbSS6z683-as" token
+read -p "Enter your Cesium Ion token: " token
 
 if [ -z "$token" ]; then
     echo -e "${RED}❌ Error: Token cannot be empty!${NC}"

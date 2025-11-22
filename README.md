@@ -94,7 +94,7 @@ See individual README files in `backend/` and `frontend/` for details.
 
 **Deployment:**
 - Automated via GitHub Actions
-- Server: Hetzner Cloud (135.181.254.130)
+- Server: Hetzner Cloud
 - Reverse Proxy: Caddy (automatic SSL)
 - Database: PostgreSQL with TimescaleDB
 - Cache: Redis

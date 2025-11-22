@@ -28,7 +28,7 @@ This guide covers:
 
 ## 🚀 Quick Reference
 
-**Server:** 135.181.254.130  
+**Server:** Hetzner Cloud  
 **Directory:** `/srv/karmanlabs`  
 **Domain:** https://karmanlab.org/tracker
 

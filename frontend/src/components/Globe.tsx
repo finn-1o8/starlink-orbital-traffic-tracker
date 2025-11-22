@@ -84,14 +84,10 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
   // Update satellite positions
   useEffect(() => {
     const viewer = viewerRef.current;
-    console.log('Globe useEffect triggered:', { viewer: !!viewer, positionsCount: positions.length });
     
     if (!viewer || positions.length === 0) {
-      console.log('Globe: Skipping update - no viewer or no positions');
       return;
     }
-    
-    console.log('Globe: Processing positions, first satellite:', positions[0]);
 
     // Remove satellites that no longer exist
     const currentNoradIds = new Set(positions.map(p => p.norad_id));
@@ -199,7 +195,9 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
           orbitEntityRef.current = entity;
         })
         .catch(error => {
-          console.error('Failed to load orbit:', error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load orbit:', error);
+          }
         });
     }
   }, [selectedSatellite, showOrbit]);
