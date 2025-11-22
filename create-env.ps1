@@ -27,7 +27,7 @@ Write-Host "  4. Copy your default token" -ForegroundColor White
 Write-Host ""
 
 # Prompt for Cesium token
-$token = Read-Host "<CESIUM_ION_TOKEN_REDACTED>"
+$token = Read-Host "Enter your Cesium Ion token"
 
 if ([string]::IsNullOrWhiteSpace($token)) {
     Write-Host "❌ Error: Token cannot be empty!" -ForegroundColor Red
