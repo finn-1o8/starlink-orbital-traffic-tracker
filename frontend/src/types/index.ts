@@ -6,11 +6,10 @@ export interface Satellite {
   norad_id: number;
   name: string;
   constellation: string;
-  last_updated: string;
+  last_updated: string | null;
 }
 
 export interface SatellitePosition {
-  satellite_id: number;
   norad_id: number;
   name: string;
   lat: number;
@@ -32,6 +31,15 @@ export interface OrbitPath {
   name: string;
   orbit_points: OrbitPoint[];
   duration_minutes: number;
+}
+
+export interface CongestionRequest {
+  lat: number;
+  lon: number;
+  radius_km?: number;
+  alt_min?: number;
+  alt_max?: number;
+  time?: string;
 }
 
 export interface CongestionMetrics {
@@ -56,17 +64,30 @@ export interface AltitudeDistribution {
     '340-360': number;
     '500-570': number;
     '1100-1325': number;
-    'other': number;
+    other: number;
   };
   total: number;
   timestamp: string;
+}
+
+export interface EOPreset {
+  name: string;
+  norad_id: number;
+  fov_degrees: number;
+  note: string;
+}
+
+export interface EOPresets {
+  presets: Record<string, EOPreset>;
+  count: number;
 }
 
 export interface EOAnalysisRequest {
   eo_satellite_tle?: {
     line1: string;
     line2: string;
-    name: string;
+    name?: string;
+    norad_id?: number;
     fov_degrees?: number;
   };
   eo_preset?: string;
@@ -78,28 +99,36 @@ export interface EOAnalysisRequest {
   start_time?: string;
   duration_hours?: number;
   fov_angle_degrees?: number;
+  sample_seconds?: number;
 }
 
-export interface CleanWindow {
+export interface PassWindow {
   start: string;
   end: string;
   duration_minutes: number;
-  max_elevation?: number;
+  max_elevation?: number | null;
 }
 
-export interface InterferenceEvent {
+export interface InterferingSatellite {
+  norad_id: number;
+  name: string;
+  min_angle_deg: number;
+  range_km: number;
+  at: string;
+}
+
+export interface InterferenceEvent extends PassWindow {
   time: string;
-  duration_minutes: number;
-  interfering_satellites: Array<{
-    norad_id: number;
-    name: string;
-  }>;
+  interfering_satellites: InterferingSatellite[];
   severity: number;
-  max_elevation?: number;
 }
 
 export interface EOAnalysisResult {
   eo_satellite: string;
+  eo_tle_source: 'celestrak' | 'fallback' | 'custom';
+  fov_degrees: number;
+  model: string;
+  sample_seconds: number;
   analysis_period: {
     start: string;
     end: string;
@@ -109,13 +138,21 @@ export interface EOAnalysisResult {
     lat: number;
     lon: number;
     radius_km: number;
-  };
+  } | null;
   total_passes: number;
   interfered_passes: number;
   clean_passes: number;
-  clean_windows: CleanWindow[];
+  clean_windows: PassWindow[];
   interference_events: InterferenceEvent[];
   interference_percentage: number;
+}
+
+export interface HistoricalSnapshot {
+  snapshot_date: string;
+  total_satellites: number;
+  altitude_band_340_360: number;
+  altitude_band_500_570: number;
+  altitude_band_1100_1325: number;
 }
 
 export interface WebSocketMessage {
@@ -124,5 +161,3 @@ export interface WebSocketMessage {
   timestamp?: string;
   message?: string;
 }
-
-

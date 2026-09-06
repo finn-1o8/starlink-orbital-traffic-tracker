@@ -83,7 +83,7 @@ function ShareButton({ viewState, className = '' }: ShareButtonProps) {
               </button>
 
               {/* Native Share (if available) */}
-              {navigator.share && (
+              {typeof navigator.share === 'function' && (
                 <button
                   onClick={handleNativeShare}
                   className="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-white/10 rounded-md text-left transition-all"

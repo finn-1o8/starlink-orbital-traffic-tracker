@@ -2,7 +2,7 @@
  * Cesium Globe Component
  * Main 3D visualization of satellites and Earth
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import { satelliteApi } from '../services/api';
 import type { SatellitePosition, OrbitPath } from '../types';
@@ -15,19 +15,27 @@ interface GlobeProps {
   onSatelliteClick: (noradId: number) => void;
 }
 
+const hasIonToken = Boolean(import.meta.env.VITE_CESIUM_ION_TOKEN);
+
 function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: GlobeProps) {
   const cesiumContainer = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
-  const satelliteEntitiesRef = useRef<Map<number, any>>(new Map());
-  const orbitEntityRef = useRef<any>(null);
-  const [enableRotation, setEnableRotation] = useState(false);
+  const satelliteEntitiesRef = useRef<Map<number, Cesium.Entity>>(new Map());
+  const orbitEntityRef = useRef<Cesium.Entity | null>(null);
 
   // Initialize Cesium Viewer
   useEffect(() => {
     if (!cesiumContainer.current || viewerRef.current) return;
 
     const viewer = new Cesium.Viewer(cesiumContainer.current, {
-      terrainProvider: Cesium.createWorldTerrain ? Cesium.createWorldTerrain() : undefined,
+      // World terrain and Bing imagery need a Cesium ion token. Without one we fall back to
+      // OpenStreetMap tiles on a plain ellipsoid so the app still works out of the box.
+      terrain: hasIonToken ? Cesium.Terrain.fromWorldTerrain() : undefined,
+      baseLayer: hasIonToken
+        ? undefined
+        : new Cesium.ImageryLayer(
+            new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })
+          ),
       baseLayerPicker: false,
       geocoder: false,
       homeButton: true,
@@ -38,59 +46,45 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
       scene3DOnly: true,
     });
 
-    // Set initial camera position (above Earth)
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(-74.0060, 40.7128, 15000000),
-      orientation: {
-        heading: 0,
-        pitch: -Math.PI / 2,
-        roll: 0,
-      },
+      destination: Cesium.Cartesian3.fromDegrees(-74.006, 40.7128, 15000000),
+      orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
     });
 
-    // Enable lighting
     viewer.scene.globe.enableLighting = true;
-
-    // Enable real-time clock animation for smooth satellite movement
     viewer.clock.shouldAnimate = true;
-    viewer.clock.multiplier = 1; // Real-time speed
+    viewer.clock.multiplier = 1;
 
-
-    // Handle click events
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    handler.setInputAction((click: any) => {
-      const pickedObject = viewer.scene.pick(click.position);
-      if (pickedObject && pickedObject.id && pickedObject.id.properties) {
-        const noradId = pickedObject.id.properties.norad_id?.getValue();
-        if (noradId) {
-          onSatelliteClick(noradId);
-        }
+    handler.setInputAction((click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+      const picked = viewer.scene.pick(click.position);
+      const entity = picked?.id as Cesium.Entity | undefined;
+      const noradId = entity?.properties?.norad_id?.getValue() as number | undefined;
+      if (noradId) {
+        onSatelliteClick(noradId);
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     viewerRef.current = viewer;
+    const entities = satelliteEntitiesRef.current;
 
     return () => {
-      if (handler && !handler.isDestroyed()) {
-        handler.destroy();
-      }
-      if (viewer && !viewer.isDestroyed()) {
-        viewer.destroy();
-      }
+      if (!handler.isDestroyed()) handler.destroy();
+      if (!viewer.isDestroyed()) viewer.destroy();
       viewerRef.current = null;
+      entities.clear();
+      orbitEntityRef.current = null;
     };
+    // The viewer is created once; the click handler reads the latest callback through the closure below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update satellite positions
   useEffect(() => {
     const viewer = viewerRef.current;
-    
-    if (!viewer || positions.length === 0) {
-      return;
-    }
+    if (!viewer || positions.length === 0) return;
 
-    // Remove satellites that no longer exist
-    const currentNoradIds = new Set(positions.map(p => p.norad_id));
+    const currentNoradIds = new Set(positions.map((p) => p.norad_id));
     for (const [noradId, entity] of satelliteEntitiesRef.current.entries()) {
       if (!currentNoradIds.has(noradId)) {
         viewer.entities.remove(entity);
@@ -98,35 +92,26 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
       }
     }
 
-    // Add or update satellites
-    positions.forEach(sat => {
-      let entity = satelliteEntitiesRef.current.get(sat.norad_id);
-      
+    positions.forEach((sat) => {
+      const cartesian = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
       const color = getColorByAltitude(sat.alt_km);
       const isSelected = sat.norad_id === selectedSatellite;
       const pixelSize = isSelected ? 10 : 6;
+      let entity = satelliteEntitiesRef.current.get(sat.norad_id);
 
       if (entity) {
-        // Direct position update - simple and reliable
-        entity.position = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
-        entity.show = true;
-        
+        entity.position = new Cesium.ConstantPositionProperty(cartesian);
         if (entity.point) {
-          entity.point.pixelSize = pixelSize;
-          entity.point.color = color;
-          entity.point.show = true;
+          entity.point.pixelSize = new Cesium.ConstantProperty(pixelSize);
+          entity.point.color = new Cesium.ConstantProperty(color);
         }
       } else {
-        // Create new entity
-        const cartesian = Cesium.Cartesian3.fromDegrees(sat.lon, sat.lat, sat.alt_km * 1000);
-        
         entity = viewer.entities.add({
           id: `sat-${sat.norad_id}`,
           position: cartesian,
-          show: true,
           point: {
-            pixelSize: pixelSize,
-            color: color,
+            pixelSize,
+            color,
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 1,
             scaleByDistance: new Cesium.NearFarScalar(1.5e6, 2.0, 8.0e6, 0.5),
@@ -151,13 +136,11 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
             velocity: sat.velocity_km_s,
           },
         });
-        
         satelliteEntitiesRef.current.set(sat.norad_id, entity);
       }
 
-      // Show/hide label based on selection
       if (entity.label) {
-        entity.label.show = isSelected;
+        entity.label.show = new Cesium.ConstantProperty(isSelected);
       }
     });
   }, [positions, selectedSatellite]);
@@ -167,34 +150,29 @@ function Globe({ positions, selectedSatellite, showOrbit, onSatelliteClick }: Gl
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    // Remove previous orbit
     if (orbitEntityRef.current) {
       viewer.entities.remove(orbitEntityRef.current);
       orbitEntityRef.current = null;
     }
 
-    // Show new orbit if requested
     if (showOrbit && selectedSatellite) {
-      satelliteApi.getOrbit(selectedSatellite, 90)
+      satelliteApi
+        .getOrbit(selectedSatellite, 90)
         .then((orbitData: OrbitPath) => {
-          if (!viewer || !viewerRef.current) return;
-
-          const positions = orbitData.orbit_points.map(point =>
+          if (!viewerRef.current) return;
+          const orbitPositions = orbitData.orbit_points.map((point) =>
             Cesium.Cartesian3.fromDegrees(point.lon, point.lat, point.alt_km * 1000)
           );
-
-          const entity = viewer.entities.add({
+          orbitEntityRef.current = viewer.entities.add({
             id: `orbit-${selectedSatellite}`,
             polyline: {
-              positions: positions,
+              positions: orbitPositions,
               width: 2,
               material: Cesium.Color.CYAN.withAlpha(0.6),
             },
           });
-
-          orbitEntityRef.current = entity;
         })
-        .catch(error => {
+        .catch((error: unknown) => {
           if (import.meta.env.DEV) {
             console.error('Failed to load orbit:', error);
           }
@@ -216,5 +194,3 @@ function getColorByAltitude(altKm: number) {
 }
 
 export default Globe;
-
-

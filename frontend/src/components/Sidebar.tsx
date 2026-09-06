@@ -3,7 +3,7 @@
  * Satellite list, filters, and search
  */
 import { useState, useMemo } from 'react';
-import { Search, MapPin, Layers } from 'lucide-react';
+import { Search, Layers } from 'lucide-react';
 import type { SatellitePosition } from '../types';
 
 interface SidebarProps {

@@ -7,91 +7,60 @@ import type {
   SatellitePosition,
   OrbitPath,
   CongestionMetrics,
+  CongestionRequest,
   AltitudeDistribution,
   EOAnalysisRequest,
   EOAnalysisResult,
+  EOPresets,
+  HistoricalSnapshot,
+  WebSocketMessage,
 } from '../types';
 
-// Use relative path for production (works with base path)
-// For production at /tracker, /api will resolve to https://karmanlab.org/api
+// In production the API is served under the same origin at /api; in development it is a
+// separate process on port 8000. Both can be overridden through VITE_API_URL.
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:8000/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 60000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor for logging (development only)
-api.interceptors.request.use(
-  (config) => {
-    if (import.meta.env.DEV) {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
-    }
+if (import.meta.env.DEV) {
+  api.interceptors.request.use((config) => {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
-  },
-  (error) => {
-    if (import.meta.env.DEV) {
-      console.error('[API] Request error:', error);
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV) {
-      console.log(`[API] Response from ${response.config.url}:`, response.status);
-    }
-    return response;
-  },
-  (error) => {
-    // Always log errors, but use appropriate level
-    if (import.meta.env.DEV) {
+  });
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
       console.error('[API] Response error:', error.response?.data || error.message);
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
-);
+  );
+}
 
 /**
  * Satellite Endpoints
  */
 export const satelliteApi = {
-  /**
-   * Get all satellites
-   */
   getAll: async (constellation?: string): Promise<Satellite[]> => {
     const params = constellation ? { constellation } : {};
     const response = await api.get<Satellite[]>('/satellites', { params });
     return response.data;
   },
 
-  /**
-   * Get satellite positions
-   */
   getPositions: async (time?: string): Promise<SatellitePosition[]> => {
     const params = time ? { time } : {};
     const response = await api.get<SatellitePosition[]>('/satellites/positions', { params });
     return response.data;
   },
 
-  /**
-   * Get satellite orbit path
-   */
   getOrbit: async (noradId: number, duration: number = 90): Promise<OrbitPath> => {
-    const response = await api.get<OrbitPath>(`/satellites/${noradId}/orbit`, {
-      params: { duration },
-    });
+    const response = await api.get<OrbitPath>(`/satellites/${noradId}/orbit`, { params: { duration } });
     return response.data;
   },
 
-  /**
-   * Get satellite info
-   */
   getInfo: async (noradId: number) => {
     const response = await api.get(`/satellites/${noradId}`);
     return response.data;
@@ -102,36 +71,16 @@ export const satelliteApi = {
  * Congestion Analysis Endpoints
  */
 export const congestionApi = {
-  /**
-   * Analyze congestion for a region
-   */
-  analyze: async (params: {
-    lat: number;
-    lon: number;
-    radius_km?: number;
-    alt_min?: number;
-    alt_max?: number;
-    time?: string;
-  }): Promise<CongestionMetrics> => {
+  analyze: async (params: CongestionRequest): Promise<CongestionMetrics> => {
     const response = await api.get<CongestionMetrics>('/congestion', { params });
     return response.data;
   },
 
-  /**
-   * Get density heatmap
-   */
-  getHeatmap: async (params: {
-    alt_min?: number;
-    alt_max?: number;
-    grid_size?: number;
-  }) => {
+  getHeatmap: async (params: { alt_min?: number; alt_max?: number; grid_size?: number }) => {
     const response = await api.get('/congestion/heatmap', { params });
     return response.data;
   },
 
-  /**
-   * Get altitude distribution
-   */
   getAltitudeDistribution: async (): Promise<AltitudeDistribution> => {
     const response = await api.get<AltitudeDistribution>('/congestion/altitude-distribution');
     return response.data;
@@ -142,108 +91,94 @@ export const congestionApi = {
  * EO Analysis Endpoints
  */
 export const eoApi = {
-  /**
-   * Analyze EO interference
-   */
   analyze: async (request: EOAnalysisRequest): Promise<EOAnalysisResult> => {
     const response = await api.post<EOAnalysisResult>('/eo-analysis', request);
     return response.data;
   },
 
-  /**
-   * Get available EO presets
-   */
-  getPresets: async () => {
-    const response = await api.get('/eo-analysis/presets');
+  getPresets: async (): Promise<EOPresets> => {
+    const response = await api.get<EOPresets>('/eo-analysis/presets');
     return response.data;
   },
 };
 
 /**
+ * Historical snapshots
+ */
+export const historyApi = {
+  getSnapshots: async (days: number = 30): Promise<HistoricalSnapshot[]> => {
+    const response = await api.get<HistoricalSnapshot[]>('/history/snapshots', { params: { days } });
+    return response.data;
+  },
+};
+
+function defaultWebSocketUrl(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+  if (import.meta.env.PROD) {
+    const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${scheme}://${window.location.host}/api`;
+  }
+  return 'ws://localhost:8000/api';
+}
+
+/**
  * WebSocket connection for real-time updates with automatic reconnection
  */
 export const createWebSocket = (
-  onMessage: (data: any) => void, 
+  onMessage: (data: WebSocketMessage) => void,
   onError?: (error: Event) => void,
   onConnect?: () => void
 ) => {
-  // Use secure WebSocket for production
-  const WS_URL = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://karmanlab.org/api' : 'ws://localhost:8000/api');
+  const WS_URL = defaultWebSocketUrl();
   let ws: WebSocket | null = null;
   let reconnectAttempts = 0;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  let closedByUser = false;
   const maxReconnectAttempts = 5;
-  const initialReconnectDelay = 1000; // Start with 1 second
+  const initialReconnectDelay = 1000;
 
   const connect = () => {
     try {
       ws = new WebSocket(`${WS_URL}/ws/positions`);
 
       ws.onopen = () => {
-        if (import.meta.env.DEV) {
-          console.log('[WebSocket] Connected');
-        }
-        reconnectAttempts = 0; // Reset on successful connection
+        reconnectAttempts = 0;
         if (onConnect) onConnect();
       };
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          onMessage(data);
+          onMessage(JSON.parse(event.data) as WebSocketMessage);
         } catch (error) {
-          if (import.meta.env.DEV) {
-            console.error('[WebSocket] Failed to parse message:', error);
-          }
+          if (import.meta.env.DEV) console.error('[WebSocket] Failed to parse message:', error);
         }
       };
 
       ws.onerror = (error) => {
-        // Only log errors if not reconnecting (to reduce console noise)
-        if (import.meta.env.DEV && reconnectAttempts === 0) {
-          console.warn('[WebSocket] Connection error, will retry...');
-        }
         if (onError) onError(error);
       };
 
       ws.onclose = (event) => {
-        if (event.wasClean) {
-          if (import.meta.env.DEV) {
-            console.log('[WebSocket] Connection closed cleanly');
-          }
-        } else {
-          // Connection lost, attempt to reconnect
-          if (reconnectAttempts < maxReconnectAttempts) {
-            const delay = initialReconnectDelay * Math.pow(2, reconnectAttempts);
-            reconnectAttempts++;
-            if (import.meta.env.DEV) {
-              console.log(`[WebSocket] Reconnecting in ${delay}ms... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
-            }
-            
-            reconnectTimeout = setTimeout(() => {
-              connect();
-            }, delay);
-          } else {
-            if (import.meta.env.DEV) {
-              console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
-            }
-          }
+        if (closedByUser || event.wasClean) return;
+        if (reconnectAttempts < maxReconnectAttempts) {
+          const delay = initialReconnectDelay * Math.pow(2, reconnectAttempts);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(connect, delay);
+        } else if (import.meta.env.DEV) {
+          console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
         }
       };
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('[WebSocket] Failed to create connection:', error);
-      }
+      if (import.meta.env.DEV) console.error('[WebSocket] Failed to create connection:', error);
       if (onError) onError(error as Event);
     }
   };
 
-  // Start initial connection
   connect();
 
-  // Return WebSocket with cleanup function
   return {
     close: () => {
+      closedByUser = true;
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
@@ -255,10 +190,8 @@ export const createWebSocket = (
     },
     get readyState() {
       return ws?.readyState ?? WebSocket.CLOSED;
-    }
+    },
   };
 };
 
 export default api;
-
-

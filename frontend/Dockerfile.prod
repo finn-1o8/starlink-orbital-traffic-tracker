@@ -1,64 +1,29 @@
-FROM node:20-alpine as builder
+# Production image: static build served by nginx.
+#
+#   docker build -f Dockerfile.prod --build-arg CESIUM_ION_TOKEN=... -t tracker-frontend .
+#
+# CESIUM_ION_TOKEN is optional (without it the globe uses OpenStreetMap tiles, no terrain).
+# LANDING_URL is optional and adds a "Back" link to a parent site.
+
+FROM node:22-alpine AS builder
 
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Copy source code
+RUN npm ci
 COPY . .
 
-# Set environment variables for production build
-# Cesium Ion token must be provided as build argument:
-# docker build --build-arg CESIUM_ION_TOKEN=your_token_here -f Dockerfile.prod -t image-name .
-ARG CESIUM_ION_TOKEN
-ENV SKIP_PREFLIGHT_CHECK=true
+ARG CESIUM_ION_TOKEN=
+ARG LANDING_URL=
 ENV VITE_API_URL=/api
-ENV VITE_WS_URL=wss://karmanlab.org/api
 ENV VITE_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
+ENV VITE_LANDING_URL=${LANDING_URL}
 
-# Build application (with fallbacks)
-RUN npm run build -- --mode production || npm run build:prod || npx vite build
+RUN npm run build
 
-# Production stage with Nginx
-FROM nginx:alpine
+FROM nginx:1.27-alpine
 
-# Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Create nginx config for SPA with base path support
-RUN echo 'server { \
-    listen 80; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    \
-    # Enable gzip \
-    gzip on; \
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript; \
-    \
-    # Cesium assets - serve from tracker/cesium when /cesium is requested \
-    location ~ ^/cesium(/.*)?$ { \
-        alias /usr/share/nginx/html/tracker/cesium$1; \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-    \
-    # Cache static assets \
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-    \
-    # SPA routing - serve index.html for all routes \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
-
