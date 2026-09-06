@@ -5,7 +5,7 @@
 # CESIUM_ION_TOKEN is optional (without it the globe uses OpenStreetMap tiles, no terrain).
 # LANDING_URL is optional and adds a "Back" link to a parent site.
 
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
