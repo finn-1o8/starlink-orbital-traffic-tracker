@@ -1,44 +1,12 @@
-# 🚀 Deployment Directory
+# Deployment files
 
-This directory contains all files needed to deploy the Tracker application to production.
+| File | Purpose |
+|---|---|
+| `DEPLOYMENT.md` | How the single-host deployment is put together and operated |
+| `docker-compose.yml` | Production services (Caddy, frontend, backend, landing page, PostgreSQL, Redis) |
+| `Caddyfile` | Reverse proxy and automatic TLS |
+| `env.template` | Variables required by the Compose file |
+| `setup-server.sh` | One-shot host setup |
+| `portfolio-landing-*.example` | Templates for the separate landing-page repository that shares this host |
 
-## 📁 Files
-
-### Essential Files
-- `DEPLOYMENT.md` - **Complete deployment guide** (read this first)
-- `docker-compose.yml` - Service orchestration for production server
-- `Caddyfile` - Reverse proxy and SSL configuration
-- `env.template` - Environment variables template
-- `setup-server.sh` - Automated server setup script
-
-### Example Files (for Portfolio Landing repo)
-- `portfolio-landing-Dockerfile.example` - Dockerfile template
-- `portfolio-landing-github-actions.example.yml` - GitHub Actions workflow
-
-## 📖 Documentation
-
-**👉 Start here:** [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-This guide covers:
-- Architecture overview
-- How path-based routing works
-- Configuration details
-- Deployment process
-- Troubleshooting
-
-## 🚀 Quick Reference
-
-**Server:** Hetzner Cloud  
-**Directory:** `/srv/karmanlabs`  
-**Domain:** https://karmanlab.org/tracker
-
-**Services:**
-- Tracker Frontend (React + Cesium)
-- Tracker Backend (FastAPI)
-- PostgreSQL (TimescaleDB)
-- Redis
-- Caddy (Reverse Proxy + SSL)
-
----
-
-For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+Start with `DEPLOYMENT.md`.

@@ -1,38 +1,29 @@
-version: '3.8'
-
-# For local development, create a .env file in the root directory with:
-# POSTGRES_DB=orbital_tracker
-# POSTGRES_USER=orbital_user
-# POSTGRES_PASSWORD=your_secure_password
-# CESIUM_ION_TOKEN=your_cesium_token_here
+# Local development stack. Copy .env.example to .env first and set POSTGRES_PASSWORD.
+# Database and cache ports are bound to localhost only.
 
 services:
-  # PostgreSQL Database
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: postgres:16-alpine
     container_name: orbital-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-orbital_tracker}
       POSTGRES_USER: ${POSTGRES_USER:-orbital_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbital_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orbital_user -d orbital_tracker"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orbital_user} -d ${POSTGRES_DB:-orbital_tracker}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - orbital-network
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: orbital-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -41,22 +32,16 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-    networks:
-      - orbital-network
 
-  # Backend API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: orbital-backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-orbital_user}:${POSTGRES_PASSWORD:-orbital_pass}@postgres:5432/${POSTGRES_DB:-orbital_tracker}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orbital_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-orbital_tracker}
       REDIS_URL: redis://redis:6379/0
-      API_HOST: 0.0.0.0
-      API_PORT: 8000
       CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173
       TLE_UPDATE_INTERVAL_HOURS: 6
+      WS_UPDATE_SECONDS: ${WS_UPDATE_SECONDS:-5}
     ports:
       - "8000:8000"
     depends_on:
@@ -64,13 +49,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    networks:
-      - orbital-network
     restart: unless-stopped
 
-  # Frontend (Development)
   frontend:
     build:
       context: ./frontend
@@ -79,8 +59,6 @@ services:
     environment:
       VITE_API_URL: http://localhost:8000/api
       VITE_WS_URL: ws://localhost:8000/api
-      # Get your free Cesium Ion token at: https://ion.cesium.com/
-      # Set via environment variable or .env file
       VITE_CESIUM_ION_TOKEN: ${CESIUM_ION_TOKEN:-}
     ports:
       - "3001:3000"
@@ -89,18 +67,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    networks:
-      - orbital-network
-    command: npm run dev
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
-
-networks:
-  orbital-network:
-    driver: bridge
-
-

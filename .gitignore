@@ -8,16 +8,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 env/
 venv/
+.venv/
 ENV/
-.venv
-pip-log.txt
-pip-delete-this-directory.txt
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
 
 # Node
 node_modules/
@@ -27,10 +26,6 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Build outputs
-/backend/dist/
-/frontend/dist/
-/frontend/build/
-*.egg-info/
 dist/
 build/
 
@@ -40,27 +35,15 @@ build/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Logs
 logs/
 *.log
 
-# Database
+# Local databases
 *.db
 *.sqlite
 *.sqlite3
-
-# Docker
-.dockerignore
-
-# Cesium
-/frontend/node_modules/cesium/
-
-# Testing
-.coverage
-.pytest_cache
-coverage/
 
 # Temporary files
 tmp/
@@ -68,6 +51,5 @@ temp/
 *.tmp
 
 # OS
-Thumbs.db
 .DS_Store
-
+Thumbs.db

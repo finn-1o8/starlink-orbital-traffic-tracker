@@ -1,146 +1,127 @@
-# 🛰️ Orbital Traffic Impact Analyzer
+# Orbital Traffic Impact Analyzer
 
-A cutting-edge web application that visualizes the Starlink satellite constellation in real-time 3D and analyzes its impact on Earth Observation (EO) satellite operations.
+Real-time 3D view of the Starlink constellation, orbital-density statistics, and a geometric estimate of when Starlink satellites cross an Earth-observation satellite's field of view.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
-![React](https://img.shields.io/badge/react-18.3+-blue.svg)
+FastAPI and SGP4 on the backend, React and Cesium on the frontend, PostgreSQL and Redis behind them, wired together with Docker Compose.
+
+![CI](https://github.com/finn-1o8/starlink-orbital-traffic-tracker/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
-![TypeScript](https://img.shields.io/badge/typescript-5.7+-blue.svg)
-![FastAPI](https://img.shields.io/badge/fastapi-0.104+-009688.svg)
-![Cesium](https://img.shields.io/badge/cesium-1.121+-4285F4.svg)
 
-## 🌟 Features
+## What it does
 
-### Core Features
-- **Real-Time 3D Visualization**: View 1000+ Starlink satellites orbiting Earth in stunning 3D
-- **Interactive Globe**: Rotate, zoom, and click satellites for detailed information
-- **Orbital Congestion Analysis**: Calculate satellite density for any region and altitude band
-- **EO Interference Analysis**: Predict when Starlink satellites interfere with Earth Observation imaging
-- **Clean Imaging Windows**: Identify optimal times for satellite imaging operations
-- **WebSocket Live Updates**: Satellite positions update automatically every 30 seconds
-- **Historical Tracking**: Daily snapshots of constellation growth and metrics
+- Tracks every object in CelesTrak's Starlink group (elements refreshed every 6 hours) and propagates all of them with SGP4 in one vectorised call.
+- Pushes positions to the browser over WebSocket every 5 seconds (configurable). Positions are computed once per interval and fanned out to every client.
+- Congestion statistics for any region and altitude band: count, density, mean spacing and closest approach, plus a global density grid and the per-shell distribution.
+- EO interference analysis: propagates an EO satellite (Sentinel-2A, Landsat 8 or Sentinel-1A from live CelesTrak elements, or any TLE you paste) together with the whole Starlink catalogue and flags each imaging pass during which a Starlink satellite sits inside the sensor's nadir-pointed field-of-view cone.
+- Daily snapshots of satellite counts per shell, kept in PostgreSQL and served from `/api/history/snapshots`.
 
-### Advanced Features
-- **Orbit Path Visualization**: Display complete orbital trajectories
-- **Altitude Band Filtering**: View satellites by altitude shells (340-360km, 500-570km, 1100-1325km)
-- **Congestion Heatmaps**: Global density visualization
-- **Analytics Dashboard**: Real-time charts and statistics
-- **REST API**: Full programmatic access to all features
+## How the EO analysis works
 
-## 🏗️ Architecture
+1. Imaging passes. Without a target region, every orbit is one pass. With a region, a pass is the time during which the sensor swath reaches the region, meaning the sub-satellite point is within the region radius plus half the swath width of the region centre.
+2. Inside each pass the EO satellite and every Starlink satellite are propagated at a fixed step (20 s by default).
+3. A Starlink satellite counts as interfering at a sample when it is below the EO satellite and the angle between the nadir vector and the line of sight to it is within half the field of view.
 
-### Tech Stack
+Limits worth knowing before quoting the numbers: the cone is always nadir-pointed, so side-looking instruments such as SAR are approximated; crossings shorter than the sampling step can be missed; the metric is purely geometric and ignores sun geometry, glint and whether the sensor would resolve the object.
 
-**Backend:**
-- Python 3.11+ with FastAPI
-- Skyfield for SGP4 orbital propagation
-- PostgreSQL with TimescaleDB for time-series data
-- Redis for position caching
-- APScheduler for automated TLE updates
-- WebSocket for real-time updates
-
-**Frontend:**
-- React 18+ with TypeScript
-- Cesium.js for 3D globe visualization
-- Tailwind CSS for styling
-- Recharts for analytics
-- Axios & TanStack Query for API communication
-
-**Infrastructure:**
-- Docker & Docker Compose
-- Caddy reverse proxy with automatic SSL
-- GitHub Actions for CI/CD
-- Hetzner cloud hosting
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 20+ (for local development)
-- Python 3.11+ (for local development)
-
-### Local Development
+## Quick start with Docker
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/Tracker.git
-cd Tracker
-
-# Start services
+git clone https://github.com/finn-1o8/starlink-orbital-traffic-tracker.git
+cd starlink-orbital-traffic-tracker
+cp .env.example .env        # set POSTGRES_PASSWORD; CESIUM_ION_TOKEN is optional
 docker compose up -d
-
-# Frontend: http://localhost:3001
-# Backend API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
 ```
 
-### Environment Variables
+Frontend at http://localhost:3001, API at http://localhost:8000, interactive API docs at http://localhost:8000/docs. The first catalogue download takes about a minute.
 
-Copy `env.example` files and configure:
-- `backend/env.example` → `backend/.env`
-- `frontend/env.example` → `frontend/.env`
+Without a Cesium ion token the globe uses OpenStreetMap tiles on a plain ellipsoid. With one it uses Cesium World Terrain and Bing imagery. Tokens are free at https://ion.cesium.com; restrict yours to your own domain in the ion dashboard, since it ships to the browser.
 
-See individual README files in `backend/` and `frontend/` for details.
+## Local development
 
-## 📚 Documentation
-
-- **[Deployment Guide](deployment/DEPLOYMENT.md)** - Production deployment on Hetzner
-- **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
-
-## 🌐 Production
-
-**Live App:** https://karmanlab.org/tracker
-
-**Deployment:**
-- Automated via GitHub Actions
-- Server: Hetzner Cloud
-- Reverse Proxy: Caddy (automatic SSL)
-- Database: PostgreSQL with TimescaleDB
-- Cache: Redis
-
-## 🛠️ Development
-
-### Backend
+Backend:
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp .env.example .env    # optional; without DATABASE_URL a local SQLite file is used
 uvicorn app.main:app --reload
 ```
 
-### Frontend
+Frontend:
 
 ```bash
 cd frontend
-npm install
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-## 📊 API Endpoints
+Checks:
 
-- `GET /api/satellites` - List all satellites
-- `GET /api/satellites/positions` - Real-time positions
-- `GET /api/satellites/{norad_id}/orbit` - Orbit path
-- `GET /api/congestion` - Congestion analysis
-- `GET /api/eo-analysis` - EO interference analysis
-- `WebSocket /api/ws/positions` - Live position updates
+```bash
+cd backend && ruff check . && python -m pytest
+cd frontend && npm run lint && npm run build
+```
 
-Full API documentation at `/docs` when running locally.
+The backend tests run against SQLite with frozen element sets and never touch the network.
 
-## 📝 License
+## Configuration
 
-MIT License - see [LICENSE](LICENSE) file
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | local SQLite | PostgreSQL connection string in production |
+| `REDIS_URL` | `redis://localhost:6379/0` | Position cache; unreachable Redis just disables caching |
+| `CORS_ORIGINS` | localhost dev origins | Browser origins allowed to call the API and open the WebSocket |
+| `TLE_UPDATE_INTERVAL_HOURS` | `6` | CelesTrak refresh interval |
+| `WS_UPDATE_SECONDS` | `5` | WebSocket broadcast interval |
+| `POSITION_CACHE_SECONDS` | `30` | Lifetime of cached positions |
+| `SCHEDULER_ENABLED` | `true` | Background TLE refresh and daily snapshot |
+| `WS_BROADCAST_ENABLED` | `true` | WebSocket position broadcaster |
+| `VITE_CESIUM_ION_TOKEN` | empty | Frontend: Cesium ion token |
+| `VITE_LANDING_URL` | empty | Frontend: optional "Back" link in the header |
 
-## 🙏 Acknowledgments
+## API
 
-- Cesium.js for 3D globe visualization
-- Space-Track.org for TLE data
-- Starlink for the inspiration
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/satellites` | Catalogue with metadata |
+| GET | `/api/satellites/positions?time=` | Geodetic position of every satellite |
+| GET | `/api/satellites/{norad_id}` | One satellite with its current position |
+| GET | `/api/satellites/{norad_id}/orbit?duration=` | Ground-track points for the next `duration` minutes |
+| GET | `/api/congestion?lat=&lon=&radius_km=&alt_min=&alt_max=` | Regional congestion metrics |
+| GET | `/api/congestion/heatmap?alt_min=&alt_max=&grid_size=` | Global density grid |
+| GET | `/api/congestion/altitude-distribution` | Counts per Starlink shell |
+| POST | `/api/eo-analysis` | Field-of-view interference analysis |
+| GET | `/api/eo-analysis/presets` | Available EO satellites |
+| GET | `/api/history/snapshots?days=` | Daily statistics |
+| WS | `/api/ws/positions` | Live position feed |
+| GET | `/api/health` | Health and background-task status |
 
----
+## Project layout
 
-**Status:** ✅ Production-ready  
-**Last Updated:** November 2025
+```
+backend/app/services/propagation.py     vectorised SGP4, frame conversion, field-of-view geometry
+backend/app/services/eo_analyzer.py     pass detection and interference model
+backend/app/services/congestion_analyzer.py
+backend/app/services/tle_fetcher.py     CelesTrak client and catalogue upsert
+backend/app/routers/                    FastAPI endpoints
+backend/tests/                          pytest suite (SQLite, frozen elements)
+frontend/src/components/Globe.tsx       Cesium viewer
+frontend/src/components/EOAnalyzer.tsx  EO analysis UI
+deployment/                             Compose file, Caddyfile and notes for a single-VPS deployment
+```
+
+## Deployment
+
+`deployment/` contains the Compose file, the Caddy reverse-proxy configuration and a setup script for running the whole stack on one Linux host behind automatic TLS. See `deployment/DEPLOYMENT.md`.
+
+## Data sources and acknowledgements
+
+- Orbital elements: [CelesTrak](https://celestrak.org)
+- Propagation: [sgp4](https://pypi.org/project/sgp4/) and [Skyfield](https://rhodesmill.org/skyfield/)
+- Globe: [CesiumJS](https://cesium.com/platform/cesiumjs/)
+
+## License
+
+MIT, see [LICENSE](LICENSE).

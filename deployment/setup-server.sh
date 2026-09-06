@@ -42,7 +42,7 @@ cd $PROJECT_DIR
 
 # Download deployment files
 # Set GITHUB_REPO environment variable to customize repository
-GITHUB_REPO=${GITHUB_REPO:-"yourusername/your-repo"}
+GITHUB_REPO=${GITHUB_REPO:-"finn-1o8/starlink-orbital-traffic-tracker"}
 echo "📥 Downloading deployment files from ${GITHUB_REPO}..."
 curl -L -o docker-compose.yml https://raw.githubusercontent.com/${GITHUB_REPO}/main/deployment/docker-compose.yml
 curl -L -o Caddyfile https://raw.githubusercontent.com/${GITHUB_REPO}/main/deployment/Caddyfile
