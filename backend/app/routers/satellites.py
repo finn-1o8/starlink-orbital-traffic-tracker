@@ -1,35 +1,29 @@
-"""
-Satellite tracking endpoints
-"""
-import logging
+"""Satellite catalogue and position endpoints."""
 from datetime import datetime
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from typing import Optional
 
-from ..models import get_db, Satellite
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
+from ..models import Satellite, get_db
 from ..services.satellite_tracker import SatelliteTracker
 from ..utils.cache import get_cached_positions, set_cached_positions
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-# Pydantic models for request/response
 class SatelliteInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     norad_id: int
     name: str
     constellation: str
-    last_updated: datetime
-    
-    class Config:
-        from_attributes = True
+    last_updated: Optional[datetime] = None
 
 
 class SatellitePosition(BaseModel):
-    satellite_id: int
     norad_id: int
     name: str
     lat: float
@@ -39,162 +33,79 @@ class SatellitePosition(BaseModel):
     timestamp: str
 
 
+class OrbitPoint(BaseModel):
+    lat: float
+    lon: float
+    alt_km: float
+    timestamp: str
+
+
 class OrbitPath(BaseModel):
     norad_id: int
     name: str
-    orbit_points: List[dict]
+    orbit_points: list[OrbitPoint]
     duration_minutes: int
 
 
-@router.get("/satellites", response_model=List[SatelliteInfo])
+class SatelliteDetail(SatelliteInfo):
+    epoch: Optional[datetime] = None
+    current_position: Optional[SatellitePosition] = None
+
+
+@router.get("/satellites", response_model=list[SatelliteInfo])
 async def get_satellites(
     db: Session = Depends(get_db),
-    constellation: Optional[str] = Query(None, description="Filter by constellation")
+    constellation: Optional[str] = Query(None, description="Filter by constellation name"),
 ):
-    """
-    Get list of all tracked satellites with metadata.
-    
-    Args:
-        constellation: Optional filter by constellation name
-        
-    Returns:
-        List of satellite information
-    """
-    try:
-        query = db.query(Satellite)
-        
-        if constellation:
-            query = query.filter(Satellite.constellation == constellation.upper())
-        
-        satellites = query.all()
-        
-        logger.info(f"Retrieved {len(satellites)} satellites")
-        return satellites
-        
-    except Exception as e:
-        logger.error(f"Failed to retrieve satellites: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """All tracked satellites with their metadata."""
+    query = db.query(Satellite)
+    if constellation:
+        query = query.filter(Satellite.constellation == constellation.upper())
+    return query.order_by(Satellite.norad_id).all()
 
 
-@router.get("/satellites/positions", response_model=List[SatellitePosition])
+@router.get("/satellites/positions", response_model=list[SatellitePosition])
 async def get_satellite_positions(
-    time: Optional[str] = Query(None, description="ISO 8601 timestamp"),
-    db: Session = Depends(get_db)
+    time: Optional[datetime] = Query(None, description="ISO 8601 timestamp (default: now)"),
+    db: Session = Depends(get_db),
 ):
-    """
-    Get current positions of all satellites.
-    
-    Args:
-        time: Optional ISO 8601 timestamp (default: now)
-        
-    Returns:
-        List of satellite positions
-    """
-    try:
-        # Parse time if provided
-        target_time = None
-        if time:
-            try:
-                target_time = datetime.fromisoformat(time.replace('Z', '+00:00'))
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid time format. Use ISO 8601.")
-        
-        # Check cache first (only for current time)
-        if target_time is None:
-            cached = get_cached_positions()
-            if cached:
-                logger.info("Returning cached positions")
-                return cached
-        
-        # Calculate positions
-        tracker = SatelliteTracker(db)
-        positions = tracker.get_all_positions(target_time)
-        
-        # Cache if current time
-        if target_time is None:
-            set_cached_positions(positions)
-        
-        logger.info(f"Calculated {len(positions)} satellite positions")
-        return positions
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get positions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Geodetic position of every satellite. Current positions are served from cache when available."""
+    if time is None:
+        cached = get_cached_positions()
+        if cached:
+            return cached
+    tracker = SatelliteTracker(db)
+    positions = await run_in_threadpool(tracker.get_all_positions, time)
+    if time is None:
+        set_cached_positions(positions)
+    return positions
 
 
 @router.get("/satellites/{norad_id}/orbit", response_model=OrbitPath)
 async def get_satellite_orbit(
     norad_id: int,
     duration: int = Query(90, description="Orbit duration in minutes", ge=10, le=180),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Get orbit path points for a specific satellite.
-    
-    Args:
-        norad_id: NORAD catalog number
-        duration: Orbit duration in minutes (default: 90)
-        
-    Returns:
-        Orbit path with position points
-    """
-    try:
-        tracker = SatelliteTracker(db)
-        orbit_data = tracker.get_orbit_path(norad_id, duration_minutes=duration)
-        
-        if not orbit_data:
-            raise HTTPException(status_code=404, detail=f"Satellite {norad_id} not found")
-        
-        logger.info(f"Calculated orbit for satellite {norad_id}")
-        return orbit_data
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get orbit: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Ground-track points for one satellite, starting now."""
+    orbit = await run_in_threadpool(SatelliteTracker(db).get_orbit_path, norad_id, duration)
+    if not orbit:
+        raise HTTPException(status_code=404, detail=f"Satellite {norad_id} not found")
+    return orbit
 
 
-@router.get("/satellites/{norad_id}")
-async def get_satellite_info(
-    norad_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get detailed information about a specific satellite.
-    
-    Args:
-        norad_id: NORAD catalog number
-        
-    Returns:
-        Satellite information including current position
-    """
-    try:
-        # Get satellite from database
-        satellite = db.query(Satellite).filter(Satellite.norad_id == norad_id).first()
-        
-        if not satellite:
-            raise HTTPException(status_code=404, detail=f"Satellite {norad_id} not found")
-        
-        # Get current position
-        tracker = SatelliteTracker(db)
-        position = tracker.propagate_position(satellite.id)
-        
-        return {
-            "norad_id": satellite.norad_id,
-            "name": satellite.name,
-            "constellation": satellite.constellation,
-            "epoch": satellite.epoch.isoformat() if satellite.epoch else None,
-            "last_updated": satellite.last_updated.isoformat() if satellite.last_updated else None,
-            "current_position": position
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get satellite info: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
+@router.get("/satellites/{norad_id}", response_model=SatelliteDetail)
+async def get_satellite_info(norad_id: int, db: Session = Depends(get_db)):
+    """Catalogue entry plus current position for one satellite."""
+    satellite = db.query(Satellite).filter(Satellite.norad_id == norad_id).first()
+    if not satellite:
+        raise HTTPException(status_code=404, detail=f"Satellite {norad_id} not found")
+    position = await run_in_threadpool(SatelliteTracker(db).get_position, norad_id)
+    return SatelliteDetail(
+        norad_id=satellite.norad_id,
+        name=satellite.name,
+        constellation=satellite.constellation,
+        last_updated=satellite.last_updated,
+        epoch=satellite.epoch,
+        current_position=position,
+    )

@@ -1,151 +1,122 @@
 """
-WebSocket endpoint for real-time satellite position updates
-"""
-import logging
-import asyncio
-import json
-import os
-from typing import Set
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from sqlalchemy.orm import Session
+WebSocket position feed.
 
-from ..models import get_db
+Positions are computed once per interval by a single background task (in a
+worker thread, so the event loop never blocks) and fanned out to every
+connected client. Clients only receive; anything they send is ignored.
+"""
+import asyncio
+import logging
+import os
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
+
+from ..models.database import SessionLocal
 from ..services.satellite_tracker import SatelliteTracker
+from ..utils.cache import get_cached_positions, set_cached_positions
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Allowed origins for WebSocket connections
 ALLOWED_ORIGINS = [
-    origin.strip() 
-    for origin in os.getenv(
-        "CORS_ORIGINS", 
-        "http://localhost:3000,http://localhost:3001,http://localhost:5173"
-    ).split(',')
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:5173").split(",")
+    if origin.strip()
 ]
 
 
 class ConnectionManager:
-    """Manages WebSocket connections."""
-    
-    def __init__(self):
-        self.active_connections: Set[WebSocket] = set()
-    
-    async def connect(self, websocket: WebSocket):
-        """Accept and register a new connection."""
-        origin = websocket.headers.get("origin") or websocket.headers.get("Origin")
-        logger.info(f"WebSocket connection attempt from origin: {origin}")
-        
-        # Only reject if origin is explicitly provided and not in allowed list
-        # Accept connections without origin (some clients don't send it)
+    def __init__(self) -> None:
+        self.active_connections: set[WebSocket] = set()
+
+    @property
+    def count(self) -> int:
+        return len(self.active_connections)
+
+    async def connect(self, websocket: WebSocket) -> bool:
+        """Accept the socket unless it comes from a browser origin that is not allowed."""
+        origin = websocket.headers.get("origin")
         if origin and origin not in ALLOWED_ORIGINS:
-            logger.warning(f"Rejected WebSocket connection from origin: {origin} (not in {ALLOWED_ORIGINS})")
+            logger.warning("Rejected WebSocket from origin %s", origin)
             await websocket.close(code=1008, reason="Origin not allowed")
-            return
-        
-        try:
-            await websocket.accept()
-            self.active_connections.add(websocket)
-            logger.info(f"Client connected from {origin or 'unknown'}. Total connections: {len(self.active_connections)}")
-        except Exception as e:
-            logger.error(f"Failed to accept WebSocket connection: {e}")
-            raise
-    
-    def disconnect(self, websocket: WebSocket):
-        """Remove a connection."""
+            return False
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        logger.info("WebSocket client connected (%d total)", self.count)
+        return True
+
+    def disconnect(self, websocket: WebSocket) -> None:
         self.active_connections.discard(websocket)
-        logger.info(f"Client disconnected. Total connections: {len(self.active_connections)}")
-    
-    async def broadcast(self, message: dict):
-        """Broadcast message to all connected clients."""
-        disconnected = set()
-        
-        for connection in self.active_connections:
+        logger.info("WebSocket client disconnected (%d total)", self.count)
+
+    async def broadcast(self, message: dict) -> None:
+        dead = []
+        for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
-            except Exception as e:
-                logger.error(f"Failed to send to client: {e}")
-                disconnected.add(connection)
-        
-        # Remove disconnected clients
-        for connection in disconnected:
+            except Exception:  # noqa: BLE001 - a failed send means the client is gone
+                dead.append(connection)
+        for connection in dead:
             self.disconnect(connection)
 
 
 manager = ConnectionManager()
 
 
+def _compute_positions() -> list[dict]:
+    db = SessionLocal()
+    try:
+        positions = SatelliteTracker(db).get_all_positions()
+        set_cached_positions(positions)
+        return positions
+    finally:
+        db.close()
+
+
+def _message(positions: list[dict]) -> dict:
+    return {
+        "type": "positions",
+        "data": positions,
+        "timestamp": positions[0]["timestamp"] if positions else datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def broadcast_positions_forever(interval_seconds: float) -> None:
+    """Background task started from the application lifespan."""
+    logger.info("Position broadcaster running every %.1fs", interval_seconds)
+    while True:
+        try:
+            if manager.count:
+                positions = await run_in_threadpool(_compute_positions)
+                await manager.broadcast(_message(positions))
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            logger.exception("Position broadcast failed")
+        await asyncio.sleep(interval_seconds)
+
+
 @router.websocket("/ws/positions")
 async def websocket_positions(websocket: WebSocket):
-    """
-    WebSocket endpoint for real-time satellite position updates.
-    Sends position updates every 30 seconds.
-    """
-    await manager.connect(websocket)
-    
+    """Send the latest positions immediately, then every broadcast interval."""
+    if not await manager.connect(websocket):
+        return
     try:
-        # Send initial positions immediately
-        from ..models.database import SessionLocal
-        db = SessionLocal()
-        
-        try:
-            tracker = SatelliteTracker(db)
-            positions = tracker.get_all_positions()
-            
-            await websocket.send_json({
-                'type': 'positions',
-                'data': positions,
-                'timestamp': positions[0]['timestamp'] if positions else None
-            })
-            
-            logger.info(f"Sent initial positions to client: {len(positions)} satellites")
-            
-        finally:
-            db.close()
-        
-        # Keep connection alive and send updates periodically
+        positions = get_cached_positions() or await run_in_threadpool(_compute_positions)
+        await websocket.send_json(_message(positions))
         while True:
-            try:
-                # Wait for 1 second (ultra real-time updates!)
-                await asyncio.sleep(1)
-                
-                # Get fresh database session for updates
-                db = SessionLocal()
-                try:
-                    tracker = SatelliteTracker(db)
-                    positions = tracker.get_all_positions()
-                    
-                    await websocket.send_json({
-                        'type': 'positions',
-                        'data': positions,
-                        'timestamp': positions[0]['timestamp'] if positions else None
-                    })
-                    
-                    logger.info(f"Sent position update: {len(positions)} satellites")
-                    
-                finally:
-                    db.close()
-                
-            except WebSocketDisconnect:
-                break
-            except Exception as e:
-                logger.error(f"Error in WebSocket update loop: {e}")
-                break
-    
+            await websocket.receive_text()  # keeps the connection open until the client leaves
     except WebSocketDisconnect:
-        logger.info("Client disconnected from WebSocket")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        pass
+    except Exception:  # noqa: BLE001
+        logger.exception("WebSocket error")
     finally:
         manager.disconnect(websocket)
 
 
 @router.get("/ws/stats")
 async def websocket_stats():
-    """Get WebSocket connection statistics."""
-    return {
-        "active_connections": len(manager.active_connections)
-    }
-
-
+    return {"active_connections": manager.count}

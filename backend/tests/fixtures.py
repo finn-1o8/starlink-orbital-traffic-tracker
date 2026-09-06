@@ -1,0 +1,42 @@
+"""Real element sets fetched from CelesTrak on 2026-09-06, frozen so tests never touch the network."""
+from datetime import datetime, timezone
+
+from app.services.propagation import TLE
+
+# Epoch of the ISS elements below: day 249.14365580 of 2026.
+ISS_EPOCH = datetime(2026, 9, 6, 3, 26, 52, tzinfo=timezone.utc)
+
+ISS = TLE(
+    norad_id=25544,
+    name="ISS (ZARYA)",
+    line1="1 25544U 98067A   26249.14365580  .00003658  00000+0  74533-4 0  9992",
+    line2="2 25544  51.6309 259.4125 0005023 112.3189 247.8332 15.49001728584305",
+)
+
+SENTINEL_2A = TLE(
+    norad_id=40697,
+    name="SENTINEL-2A",
+    line1="1 40697U 15028A   26249.19369740 -.00000074  00000+0 -11786-4 0  9993",
+    line2="2 40697  98.5625 322.8712 0001225  85.6513 274.4810 14.30818788585312",
+)
+
+LANDSAT_8 = TLE(
+    norad_id=39084,
+    name="LANDSAT 8",
+    line1="1 39084U 13008A   26249.19255234  .00000148  00000+0  42980-4 0  9999",
+    line2="2 39084  98.2233 318.3368 0001261  96.5506 263.5836 14.57111098709697",
+)
+
+STARLINK_TLE_TEXT = """STARLINK-1008
+1 44714U 19074B   26249.14104809  .00061327  00000+0  64785-3 0  9992
+2 44714  53.1478  37.2573 0002729  90.1893 269.9435 15.63634332376827
+STARLINK-1012
+1 44718U 19074F   26248.87654891  .00067096  00000+0  69620-3 0  9998
+2 44718  53.1504  38.7950 0002096 300.2284  59.8524 15.64054479376770
+STARLINK-1017
+1 44723U 19074L   26248.60768932  .00035062  00000+0  92202-3 0  9997
+2 44723  53.0452  52.0824 0001664 295.0262  65.0568 15.38273353376539
+"""
+
+# A time close to the element epochs, so propagation errors stay negligible.
+ANALYSIS_TIME = datetime(2026, 9, 6, 12, 0, 0, tzinfo=timezone.utc)

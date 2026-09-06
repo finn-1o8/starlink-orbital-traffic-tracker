@@ -1,35 +1,37 @@
-"""
-Database configuration and session management.
-"""
+"""Database engine and session management."""
+import logging
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://orbital_user:orbital_pass@localhost:5432/orbital_tracker")
+logger = logging.getLogger(__name__)
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=False
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./orbital_tracker.db"
+    logger.warning("DATABASE_URL is not set; falling back to local SQLite at %s", DATABASE_URL)
 
+_engine_kwargs: dict = {"pool_pre_ping": True}
+if DATABASE_URL.startswith("sqlite"):
+    # Sessions are handed to worker threads for CPU-bound work.
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    _engine_kwargs.update(pool_size=10, max_overflow=20, pool_recycle=3600)
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 def get_db():
-    """
-    Dependency function to get database session.
-    Use with FastAPI Depends().
-    """
+    """FastAPI dependency that yields a session and always closes it."""
     db = SessionLocal()
     try:
         yield db
@@ -37,11 +39,8 @@ def get_db():
         db.close()
 
 
-def init_db():
-    """
-    Initialize database tables.
-    Call this on application startup.
-    """
+def init_db() -> None:
+    """Create tables that do not exist yet."""
+    from . import satellite  # noqa: F401  (registers the models on Base)
+
     Base.metadata.create_all(bind=engine)
-
-

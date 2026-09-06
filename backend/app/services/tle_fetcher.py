@@ -1,233 +1,174 @@
 """
-TLE Data Fetching Service
-Fetches Two-Line Element data from CelesTrak and updates the database.
+TLE data from CelesTrak.
+
+Starlink elements are pulled as one group file and upserted into the
+database. Individual objects (the EO satellites used by the interference
+analysis) are fetched by catalogue number and cached, so the analysis runs on
+current orbits rather than hard-coded elements.
 """
-import requests
+from __future__ import annotations
+
 import logging
-from datetime import datetime, timezone
-from typing import List, Dict, Optional
+import time
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import requests
 from sqlalchemy.orm import Session
+
 from ..models.satellite import Satellite
+from ..utils.cache import cache_custom, get_cached
+from .propagation import TLE
 
 logger = logging.getLogger(__name__)
 
+CELESTRAK_GP_URL = "https://celestrak.org/NORAD/elements/gp.php"
+USER_AGENT = "starlink-orbital-traffic-tracker/1.0 (https://github.com/finn-1o8/starlink-orbital-traffic-tracker)"
+EO_TLE_CACHE_SECONDS = 6 * 3600
+
+
+def tle_checksum_ok(line: str) -> bool:
+    """Validate the modulo-10 checksum in the last column of a TLE line."""
+    if len(line) < 2 or not line[-1].isdigit():
+        return False
+    total = 0
+    for ch in line[:-1]:
+        if ch.isdigit():
+            total += int(ch)
+        elif ch == "-":
+            total += 1
+    return total % 10 == int(line[-1])
+
+
+def parse_tle_epoch(line1: str) -> Optional[datetime]:
+    """Epoch from TLE line 1 (YYDDD.DDDDDDDD in columns 19-32), or None if unreadable."""
+    try:
+        epoch_str = line1[18:32].strip()
+        year = int(epoch_str[:2])
+        year += 2000 if year < 57 else 1900
+        day_of_year = float(epoch_str[2:])
+        return datetime(year, 1, 1, tzinfo=timezone.utc) + timedelta(days=day_of_year - 1)
+    except (ValueError, IndexError):
+        return None
+
+
+def parse_tle_text(tle_text: str) -> list[dict]:
+    """Parse three-line TLE text into dicts with name, norad_id, line1, line2 and epoch."""
+    lines = [ln.rstrip() for ln in tle_text.splitlines() if ln.strip()]
+    parsed: list[dict] = []
+    for i in range(0, len(lines) - 2, 3):
+        name, line1, line2 = lines[i].strip(), lines[i + 1].strip(), lines[i + 2].strip()
+        if not (line1.startswith("1 ") and line2.startswith("2 ")):
+            logger.warning("Skipping malformed TLE block for %r", name)
+            continue
+        try:
+            norad_id = int(line1[2:7])
+        except ValueError:
+            logger.warning("Skipping TLE with unreadable catalogue number: %r", name)
+            continue
+        if not (tle_checksum_ok(line1) and tle_checksum_ok(line2)):
+            logger.warning("TLE checksum mismatch for %s (NORAD %s); keeping it", name, norad_id)
+        parsed.append(
+            {
+                "name": name,
+                "norad_id": norad_id,
+                "line1": line1,
+                "line2": line2,
+                "epoch": parse_tle_epoch(line1),
+            }
+        )
+    return parsed
+
+
+def _get(params: dict, timeout: float = 30.0) -> str:
+    response = requests.get(CELESTRAK_GP_URL, params=params, timeout=timeout, headers={"User-Agent": USER_AGENT})
+    response.raise_for_status()
+    return response.text
+
+
+def fetch_group(group: str = "starlink", retries: int = 3, retry_delay: float = 5.0) -> Optional[list[dict]]:
+    """Download a CelesTrak group (for example ``starlink``) as parsed TLE dicts."""
+    for attempt in range(1, retries + 1):
+        try:
+            logger.info("Fetching %s TLEs from CelesTrak (attempt %d/%d)", group, attempt, retries)
+            tles = parse_tle_text(_get({"GROUP": group, "FORMAT": "tle"}))
+            if not tles:
+                raise ValueError("CelesTrak returned no parsable TLEs")
+            logger.info("Fetched %d %s TLEs", len(tles), group)
+            return tles
+        except (requests.RequestException, ValueError) as exc:
+            logger.error("TLE fetch failed (attempt %d): %s", attempt, exc)
+            if attempt < retries:
+                time.sleep(retry_delay)
+    return None
+
+
+def fetch_tle_by_catnr(norad_id: int) -> Optional[TLE]:
+    """Current TLE for one catalogue number, cached for six hours. None if unavailable."""
+    key = f"tle:{norad_id}"
+    cached = get_cached(key)
+    if cached:
+        return TLE(**cached)
+    try:
+        parsed = parse_tle_text(_get({"CATNR": norad_id, "FORMAT": "tle"}, timeout=15.0))
+    except requests.RequestException as exc:
+        logger.warning("Could not fetch TLE for NORAD %s: %s", norad_id, exc)
+        return None
+    if not parsed:
+        logger.warning("CelesTrak has no TLE for NORAD %s", norad_id)
+        return None
+    row = parsed[0]
+    tle = TLE(norad_id=row["norad_id"], name=row["name"], line1=row["line1"], line2=row["line2"])
+    cache_custom(key, asdict(tle), expiry=EO_TLE_CACHE_SECONDS)
+    return tle
+
 
 class TLEFetcher:
-    """
-    Fetches and parses TLE data from CelesTrak.
-    """
-    
-    CELESTRAK_STARLINK_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle"
-    MAX_RETRIES = 3
-    RETRY_DELAY = 5  # seconds
-    
+    """Fetches the Starlink catalogue and upserts it into the ``satellites`` table."""
+
     def __init__(self, db: Session):
         self.db = db
-    
-    def fetch_starlink_tles(self) -> Optional[List[Dict]]:
-        """
-        Fetch Starlink TLE data from CelesTrak.
-        
-        Returns:
-            List of dictionaries containing satellite TLE data, or None on failure.
-        """
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                logger.info(f"Fetching Starlink TLEs from CelesTrak (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                
-                response = requests.get(
-                    self.CELESTRAK_STARLINK_URL,
-                    timeout=30,
-                    headers={'User-Agent': 'OrbitalTrafficAnalyzer/1.0'}
-                )
-                response.raise_for_status()
-                
-                tles = self._parse_tle_data(response.text)
-                logger.info(f"Successfully fetched {len(tles)} Starlink TLEs")
-                return tles
-                
-            except requests.RequestException as e:
-                logger.error(f"Failed to fetch TLEs (attempt {attempt + 1}): {e}")
-                if attempt < self.MAX_RETRIES - 1:
-                    import time
-                    time.sleep(self.RETRY_DELAY)
-                else:
-                    logger.error("Max retries reached. TLE fetch failed.")
-                    return None
-        
-        return None
-    
-    def _parse_tle_data(self, tle_text: str) -> List[Dict]:
-        """
-        Parse TLE format data.
-        TLE format: 3 lines per satellite (name, line1, line2)
-        
-        Args:
-            tle_text: Raw TLE text data
-            
-        Returns:
-            List of dictionaries with parsed TLE data
-        """
-        lines = [line.strip() for line in tle_text.strip().split('\n') if line.strip()]
-        satellites = []
-        
-        # Process in groups of 3 lines
-        for i in range(0, len(lines) - 2, 3):
-            try:
-                name = lines[i].strip()
-                line1 = lines[i + 1].strip()
-                line2 = lines[i + 2].strip()
-                
-                # Validate TLE format
-                if not (line1.startswith('1 ') and line2.startswith('2 ')):
-                    logger.warning(f"Invalid TLE format for {name}")
-                    continue
-                
-                # Extract NORAD ID from line 1 (columns 3-7)
-                norad_id = int(line1[2:7].strip())
-                
-                # Extract epoch from line 1 (columns 18-32)
-                epoch_str = line1[18:32].strip()
-                epoch = self._parse_tle_epoch(epoch_str)
-                
-                # Validate checksum (last digit of each line)
-                if not self._validate_tle_checksum(line1) or not self._validate_tle_checksum(line2):
-                    logger.warning(f"TLE checksum validation failed for {name} (NORAD {norad_id})")
-                    # Continue anyway - checksums can sometimes be off but TLE is still usable
-                
-                satellites.append({
-                    'name': name,
-                    'norad_id': norad_id,
-                    'line1': line1,
-                    'line2': line2,
-                    'epoch': epoch
-                })
-                
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Failed to parse TLE at line {i}: {e}")
-                continue
-        
-        return satellites
-    
-    def _parse_tle_epoch(self, epoch_str: str) -> datetime:
-        """
-        Parse TLE epoch format (YYDDD.DDDDDDDD).
-        
-        Args:
-            epoch_str: TLE epoch string
-            
-        Returns:
-            datetime object
-        """
-        try:
-            year = int(epoch_str[:2])
-            # Y2K correction
-            year = year + 2000 if year < 57 else year + 1900
-            
-            day_of_year = float(epoch_str[2:])
-            
-            # Create datetime from year and day of year
-            from datetime import timedelta
-            epoch = datetime(year, 1, 1, tzinfo=timezone.utc) + timedelta(days=day_of_year - 1)
-            return epoch
-            
-        except Exception as e:
-            logger.error(f"Failed to parse epoch '{epoch_str}': {e}")
-            return datetime.now(timezone.utc)
-    
-    def _validate_tle_checksum(self, line: str) -> bool:
-        """
-        Validate TLE checksum (modulo 10).
-        
-        Args:
-            line: TLE line to validate
-            
-        Returns:
-            True if checksum is valid
-        """
-        try:
-            checksum = int(line[-1])
-            calculated = 0
-            
-            for char in line[:-1]:
-                if char.isdigit():
-                    calculated += int(char)
-                elif char == '-':
-                    calculated += 1
-            
-            return (calculated % 10) == checksum
-        except (ValueError, IndexError):
-            return False
-    
-    def update_database(self, tles: List[Dict]) -> int:
-        """
-        Update database with fetched TLE data.
-        Creates new satellites or updates existing ones.
-        
-        Args:
-            tles: List of TLE dictionaries
-            
-        Returns:
-            Number of satellites updated
-        """
-        updated_count = 0
-        
+
+    def fetch_starlink_tles(self) -> Optional[list[dict]]:
+        return fetch_group("starlink")
+
+    def update_database(self, tles: list[dict]) -> int:
+        """Insert new satellites and refresh existing ones in a single transaction."""
+        existing = {sat.norad_id: sat for sat in self.db.query(Satellite).all()}
+        now = datetime.now(timezone.utc)
         for tle in tles:
-            try:
-                # Check if satellite exists
-                satellite = self.db.query(Satellite).filter(
-                    Satellite.norad_id == tle['norad_id']
-                ).first()
-                
-                if satellite:
-                    # Update existing
-                    satellite.name = tle['name']
-                    satellite.tle_line1 = tle['line1']
-                    satellite.tle_line2 = tle['line2']
-                    satellite.epoch = tle['epoch']
-                    satellite.last_updated = datetime.now(timezone.utc)
-                else:
-                    # Create new
-                    satellite = Satellite(
-                        norad_id=tle['norad_id'],
-                        name=tle['name'],
-                        constellation='STARLINK',
-                        tle_line1=tle['line1'],
-                        tle_line2=tle['line2'],
-                        epoch=tle['epoch']
+            sat = existing.get(tle["norad_id"])
+            if sat is None:
+                self.db.add(
+                    Satellite(
+                        norad_id=tle["norad_id"],
+                        name=tle["name"],
+                        constellation="STARLINK",
+                        tle_line1=tle["line1"],
+                        tle_line2=tle["line2"],
+                        epoch=tle["epoch"],
+                        last_updated=now,
                     )
-                    self.db.add(satellite)
-                
-                updated_count += 1
-                
-            except Exception as e:
-                logger.error(f"Failed to update satellite {tle.get('norad_id')}: {e}")
-                continue
-        
+                )
+            else:
+                sat.name = tle["name"]
+                sat.tle_line1 = tle["line1"]
+                sat.tle_line2 = tle["line2"]
+                sat.epoch = tle["epoch"]
+                sat.last_updated = now
         try:
             self.db.commit()
-            logger.info(f"Successfully updated {updated_count} satellites in database")
-        except Exception as e:
-            logger.error(f"Database commit failed: {e}")
+        except Exception:
+            logger.exception("Database commit failed while updating TLEs")
             self.db.rollback()
             return 0
-        
-        return updated_count
-    
+        logger.info("Updated %d satellites", len(tles))
+        return len(tles)
+
     def fetch_and_update(self) -> bool:
-        """
-        Main method: Fetch TLEs and update database.
-        
-        Returns:
-            True if successful, False otherwise
-        """
         tles = self.fetch_starlink_tles()
-        
         if not tles:
-            logger.error("Failed to fetch TLEs - using cached data")
+            logger.error("TLE fetch failed; keeping the existing catalogue")
             return False
-        
-        count = self.update_database(tles)
-        return count > 0
-
-
+        return self.update_database(tles) > 0
