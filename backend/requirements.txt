@@ -9,4 +9,4 @@ requests==2.34.2
 python-dotenv==1.2.3
 apscheduler==3.11.3
 pydantic==2.13.5
-numpy==2.5.2
+numpy==2.5.3
