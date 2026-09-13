@@ -1,7 +1,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 sqlalchemy==2.0.52
-psycopg2-binary==2.9.12
+psycopg2-binary==2.9.13
 redis==8.1.0
 skyfield==1.55
 sgp4==2.27
